@@ -5,7 +5,7 @@
             [clojure.string :as str]))
 
 (def system-prompt
-  "You are oml (\"oml is my lisp\"), a personal assistant. Be direct and helpful.")
+  "You are oml (\"oh my lisp\"), a personal assistant. Be direct and helpful.")
 
 (defn request
   "Pure: build the chat/completions request (url + body) from creds and messages."
