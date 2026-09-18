@@ -9,7 +9,7 @@
 oml is to Lisp agents what an agent CLI is to chat: you run it, you talk to it, and
 it becomes yours over time.
 
-```
+```text
 $ oml
 oml 0.1 · image restored — 42 objects, 17 skills
 talk to me. (drop to Lisp with a leading form)

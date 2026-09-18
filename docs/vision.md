@@ -26,7 +26,7 @@
 
 ## The loop
 
-```
+```text
 natural language
    → the agent composes and runs Lisp in the image
       → if it works, it is saved as a skill
