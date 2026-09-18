@@ -1,0 +1,84 @@
+:root {
+  --bg: #0f1115;
+  --fg: #e6e6e6;
+  --dim: #8a8f98;
+  --accent: #7dd3a0;
+  --card: #161922;
+  --line: #242836;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 var(--mono);
+  padding: 0 1.25rem;
+}
+main { max-width: 720px; margin: 0 auto; padding: 4rem 0 6rem; }
+
+.hero { text-align: left; }
+.wordmark {
+  font-size: 3.5rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+}
+.tagline { color: var(--accent); font-size: 1.15rem; margin: 0.25rem 0 1.5rem; }
+.lead { font-size: 1.15rem; color: var(--fg); max-width: 40ch; }
+
+.term {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 2rem 0;
+}
+.term .cmd { color: var(--accent); }
+.term .dim { color: var(--dim); }
+.term .you { color: #6ea8fe; }
+.term .oml { color: var(--accent); }
+
+.cta a, .links a { color: var(--accent); text-decoration: none; }
+.cta a:hover, .links a:hover { text-decoration: underline; }
+
+.why {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin: 4rem 0;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1.1rem 1.2rem;
+}
+.card h2 { margin: 0 0 0.4rem; font-size: 1rem; color: var(--accent); }
+.card p { margin: 0; color: var(--dim); font-size: 0.92rem; }
+
+.loop h2 { font-size: 1rem; color: var(--accent); }
+.flow {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  font-size: 0.86rem;
+  color: var(--fg);
+  overflow-x: auto;
+  white-space: pre;
+}
+.note { color: var(--dim); font-size: 0.92rem; max-width: 52ch; }
+
+footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--line); color: var(--dim); }
+footer .links { font-size: 0.9rem; }
+
+@media (max-width: 560px) {
+  .why { grid-template-columns: 1fr; }
+  .wordmark { font-size: 2.75rem; }
+}
