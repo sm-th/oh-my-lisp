@@ -1,0 +1,17 @@
+# Clojure / babashka
+/.cpcache/
+/.clj-kondo/.cache/
+/.lsp/.cache/
+.nrepl-port
+
+# oml runtime state
+/.oml/
+*.image
+
+# node / 11ty (landing)
+node_modules/
+_site/
+
+# editor / os
+.DS_Store
+*~
