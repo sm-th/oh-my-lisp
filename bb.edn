@@ -1,0 +1,4 @@
+{:paths ["."]
+ :tasks
+ {test {:doc "Run the launcher tests"
+        :task (shell "bb" "test/oml_test.clj")}}}

@@ -1,0 +1,251 @@
+#!/usr/bin/env bb
+;; oml — oml is my lisp.
+;;
+;; v0.0.1 launches your configured agent harness (the "mind") with the model
+;; from ~/.oml/config.edn and passes extra arguments through. There is no default
+;; harness. If none is configured, oml onboards you in natural language using its
+;; own OpenAI-compatible model, and writes the config for you.
+;;
+;; oml also tells the harness where its config lives, so once running you can
+;; reconfigure oml conversationally (e.g. "use opus as your model").
+(ns oml.core
+  (:require [babashka.fs :as fs]
+            [babashka.process :as process]
+            [babashka.http-client :as http]
+            [cheshire.core :as json]
+            [clojure.edn :as edn]
+            [clojure.pprint :as pprint]
+            [clojure.string :as str]))
+
+(def version "0.0.1")
+
+(def known-harnesses
+  "Harness keyword -> the base command it maps to."
+  {:omp ["omp"]        ; oh-my-pi
+   :pi  ["omp" "pi"]   ; oh-my-pi launch
+   :fx  ["fx"]})       ; Vercel fx
+
+(def sysprompt-harnesses
+  "Harnesses that accept --append-system-prompt (so oml can inject its self-context)."
+  #{:omp :pi})
+
+(defn home [] (or (System/getenv "HOME") (str (fs/home))))
+(defn oml-dir [] (fs/path (home) ".oml"))
+(defn config-path [] (fs/path (oml-dir) "config.edn"))
+(defn agent-md-path [] (fs/path (oml-dir) "agent.md"))
+
+(defn eprintln [& args] (binding [*out* *err*] (apply println args)))
+
+;; --- config -----------------------------------------------------------------
+
+(def config-template
+  (str/join "\n"
+    [";; ~/.oml/config.edn — oml is my lisp"
+     "{;; Which agent harness drives oml. REQUIRED — there is no default."
+     ";;   :omp  — oh-my-pi         (omp)"
+     ";;   :pi   — oh-my-pi launch  (omp pi)"
+     ";;   :fx   — Vercel fx        (fx)"
+     " :harness nil"
+     ""
+     " ;; Model to launch with, or \"auto\" for the harness's own default."
+     " :model \"auto\""
+     ""
+     " ;; Extra arguments always passed to the harness."
+     " :args []}"
+     ""]))
+
+(defn load-config []
+  (let [p (config-path)]
+    (when-not (fs/exists? p)
+      (fs/create-dirs (fs/parent p))
+      (spit (str p) config-template))
+    (edn/read-string (slurp (str p)))))
+
+(defn write-config! [new-cfg]
+  (let [p (config-path)
+        existing (if (fs/exists? p)
+                   (try (edn/read-string (slurp (str p))) (catch Throwable _ {}))
+                   {})
+        merged (merge existing (select-keys new-cfg [:harness :model :args]))]
+    (fs/create-dirs (fs/parent p))
+    (spit (str p) (str ";; ~/.oml/config.edn — oml is my lisp\n"
+                       (with-out-str (pprint/pprint merged))))
+    merged))
+
+(defn detected-harnesses []
+  (->> (keys known-harnesses)
+       (filter #(fs/which (first (known-harnesses %))))
+       sort vec))
+
+;; --- harness command --------------------------------------------------------
+
+(def agent-md
+  (str/join "\n"
+    ["# oml"
+     ""
+     "You are the mind driving **oml** (*oml is my lisp*) — a personal, persistent"
+     "Lisp environment launched from the `oml` command."
+     ""
+     "oml's own configuration is an EDN file at `~/.oml/config.edn`:"
+     ""
+     "- `:harness` — which harness drives oml (`:omp`, `:pi`, or `:fx`)"
+     "- `:model`   — the model to launch with, or `\"auto\"` for the harness default"
+     "- `:args`    — extra arguments always passed to the harness"
+     ""
+     "If the user asks to reconfigure oml — change the model, switch harness, pass"
+     "different arguments — edit `~/.oml/config.edn` accordingly. Changes take effect"
+     "on the next `oml` launch."
+     ""]))
+
+(defn ensure-agent-md! []
+  (let [p (agent-md-path)]
+    (fs/create-dirs (fs/parent p))
+    (spit (str p) agent-md)
+    p))
+
+(defn auto-model?
+  "True when the model should be left to the harness (nil, blank, or auto)."
+  [model]
+  (let [m (some-> model str str/trim str/lower-case)]
+    (or (nil? m) (contains? #{"" "auto" ":auto"} m))))
+
+(defn harness-cmd
+  "Pure: build the harness command vector from config, launch opts, and user args."
+  [{:keys [harness model args]} {:keys [system-prompt-file]} user-args]
+  (let [hk (keyword harness)
+        base (known-harnesses hk)]
+    (when-not base
+      (throw (ex-info (str "oml: unknown harness " (pr-str harness)
+                           " (expected one of " (str/join ", " (sort (keys known-harnesses))) ")")
+                      {:harness harness})))
+    (let [model-flag (when-not (auto-model? model) ["--model" (str model)])
+          sp-flag (when (and system-prompt-file (contains? sysprompt-harnesses hk))
+                    ["--append-system-prompt" (str system-prompt-file)])]
+      (vec (concat base model-flag sp-flag (or args []) user-args)))))
+
+;; --- built-in OpenAI-compatible client (onboarding) -------------------------
+
+(defn llm-creds
+  "Resolve OpenAI-compatible credentials from config :openai or the environment."
+  [cfg]
+  (let [o (:openai cfg)
+        base (or (:base-url o) (System/getenv "OPENAI_BASE_URL"))
+        key  (or (some-> (:api-key-env o) System/getenv)
+                 (:api-key o)
+                 (System/getenv "OPENAI_API_KEY"))]
+    (when (and base key)
+      {:base-url base :api-key key :model (or (:model o) "auto")})))
+
+(defn chat!
+  "One OpenAI-compatible chat/completions call. Returns the assistant text."
+  [{:keys [base-url api-key model]} system messages]
+  (let [body (json/generate-string
+               {:model (or model "auto")
+                :messages (into [{:role "system" :content system}] messages)})
+        resp (http/post (str base-url "/chat/completions")
+                        {:headers {"Authorization" (str "Bearer " api-key)
+                                   "Content-Type" "application/json"}
+                         :body body :throw false})]
+    (if (= 200 (:status resp))
+      (-> (:body resp) (json/parse-string true) (get-in [:choices 0 :message :content]) (or ""))
+      (throw (ex-info (str "oml: LLM request failed (HTTP " (:status resp) ")")
+                      {:status (:status resp) :body (:body resp)})))))
+
+(defn onboard-system-prompt [detected]
+  (str "You are the onboarding assistant for oml (\"oml is my lisp\"), a personal Lisp "
+       "environment that launches an AI agent harness. Help the user configure it.\n\n"
+       "oml's config is an EDN map with keys:\n"
+       "  :harness — one of :omp (oh-my-pi), :pi (omp pi), :fx (Vercel fx)\n"
+       "  :model   — a model id string, or \"auto\" for the harness default\n"
+       "  :args    — a vector of extra CLI args (usually [])\n\n"
+       "Harnesses detected on this machine: "
+       (if (seq detected) (str/join ", " detected) "none") ".\n\n"
+       "Ask at most one short question if you need to. As soon as you know the "
+       ":harness, reply with ONLY a fenced code block and nothing else:\n"
+       "```edn\n{:harness :omp :model \"auto\" :args []}\n```\n"
+       "Prefer a detected harness; default :model to \"auto\"."))
+
+(defn extract-config
+  "Parse an EDN config map from an assistant reply (fenced block or raw)."
+  [reply]
+  (let [block (some-> (re-find #"```(?:edn|clojure)?\s*([\s\S]*?)```" reply) second)
+        text (or block reply)]
+    (try
+      (let [c (edn/read-string text)]
+        (when (and (map? c) (contains? c :harness)) c))
+      (catch Throwable _ nil))))
+
+(defn run-onboarding! [cfg]
+  (let [creds (llm-creds cfg)]
+    (when-not creds
+      (eprintln (str "oml: no harness configured, and no OpenAI-compatible credentials"
+                     " to onboard with.\n"
+                     "     Set :harness in " (config-path)
+                     " (options: " (str/join ", " (sort (keys known-harnesses))) "),\n"
+                     "     or set OPENAI_API_KEY and OPENAI_BASE_URL to be onboarded."))
+      (System/exit 1))
+    (let [sys (onboard-system-prompt (detected-harnesses))]
+      (println "oml onboarding — tell me which harness and model you want (or ask for help).")
+      (loop [history []]
+        (print "you> ") (flush)
+        (let [line (read-line)]
+          (when (nil? line)
+            (eprintln "\noml: onboarding aborted; set :harness in the config manually.")
+            (System/exit 1))
+          (let [history (conj history {:role "user" :content line})
+                reply (chat! creds sys history)]
+            (println reply)
+            (if-let [c (extract-config reply)]
+              (let [m (write-config! c)]
+                (println (str "\noml: wrote " (config-path) " → "
+                              (pr-str (select-keys m [:harness :model]))))
+                (System/exit 0))
+              (recur (conj history {:role "assistant" :content reply})))))))))
+
+;; --- CLI --------------------------------------------------------------------
+
+(def usage
+  (str/join "\n"
+    ["oml — oml is my lisp"
+     ""
+     "Usage: oml [flags] [-- harness args...]"
+     "       oml onboard         configure oml conversationally"
+     ""
+     "Launches your configured agent harness with the model from ~/.oml/config.edn."
+     "Extra arguments (and anything after --) are passed through to the harness."
+     ""
+     "Flags:"
+     "  --version     print oml version"
+     "  --help, -h    print this help"
+     "  --print-cmd   print the resolved harness command and exit (do not launch)"
+     ""
+     "Config: ~/.oml/config.edn  (created on first run)"]))
+
+(defn launch! [cfg dry? pass]
+  (let [sp (str (ensure-agent-md!))
+        cmd (harness-cmd cfg {:system-prompt-file sp} pass)]
+    (if dry?
+      (println (str/join " " cmd))
+      (do
+        (when-not (fs/which (first cmd))
+          (eprintln (str "oml: harness '" (first cmd) "' not found on PATH"))
+          (System/exit 127))
+        (process/exec cmd)))))
+
+(defn -main [& argv]
+  (let [[flags sep] (split-with #(not= "--" %) argv)
+        oml-flag? #{"--print-cmd" "--version" "--help" "-h"}
+        pass (concat (remove oml-flag? (remove #{"onboard"} flags)) (rest sep))]
+    (cond
+      (some #{"--version"} flags) (println (str "oml/" version))
+      (some #{"--help" "-h"} flags) (println usage)
+      (some #{"onboard"} flags) (run-onboarding! (load-config))
+      :else
+      (let [dry? (boolean (some #{"--print-cmd"} flags))
+            cfg (load-config)]
+        (if (nil? (:harness cfg))
+          (run-onboarding! cfg)
+          (launch! cfg dry? pass))))))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply -main *command-line-args*))
