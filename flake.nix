@@ -1,5 +1,5 @@
 {
-  description = "oml — oml is my lisp";
+  description = "oml — oh my lisp";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
