@@ -9,17 +9,37 @@
 oml is to Lisp agents what an agent CLI is to chat: you run it, you talk to it, and
 it becomes yours over time.
 
+## Run
+
+With Nix:
+
+```text
+nix run github:sm-th/oh-my-lisp
+```
+
+Or with [babashka](https://babashka.org) from a checkout:
+
+```text
+bb -m oml.main
+```
+
+Point it at an OpenAI-compatible endpoint and talk to it:
+
+```text
+export OPENAI_API_KEY=…
+export OPENAI_BASE_URL=https://…/v1
+oml
+```
+
 ```text
 $ oml
-oml 0.1 · image restored — 42 objects, 17 skills
-talk to me. (drop to Lisp with a leading form)
+oml — talk to me. (Ctrl-D to exit)
 
-you> summarize project X and save it as a skill "weekly-x"
-oml> done — saved skill weekly-x; next time just say "weekly X".
-
-you> (skills)
-=> (:recall :note :weekly-x …)
+you> …
+oml> …
 ```
+
+Credentials can also live under `:openai` in `~/.oml/config.edn`.
 
 ## Documents
 
@@ -29,4 +49,4 @@ you> (skills)
 
 ## Status
 
-Early. Design first — see the documents above. Work happens in issues and pull requests.
+Early. The design is in the documents above. Work happens in issues and pull requests.

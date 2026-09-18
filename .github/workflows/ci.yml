@@ -20,6 +20,17 @@ jobs:
       - run: npm install
       - run: npm run build
 
+  test:
+    name: test oml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install babashka
+        run: |
+          curl -sLO https://raw.githubusercontent.com/babashka/babashka/master/install
+          chmod +x install && sudo ./install
+      - run: bb --classpath src:test test/runner.clj
+
   markdown:
     name: lint markdown
     runs-on: ubuntu-latest
