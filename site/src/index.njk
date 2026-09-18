@@ -1,0 +1,65 @@
+---
+layout: base.njk
+title: "oml — oml is my lisp"
+description: "A personal, persistent, self-evolving Lisp you talk to."
+---
+<main>
+  <header class="hero">
+    <div class="wordmark">oml</div>
+    <p class="tagline"><em>oml is my lisp.</em></p>
+    <p class="lead">
+      A personal, persistent, self-evolving Lisp you drive in natural language —
+      and, when you want precision, in Lisp directly.
+    </p>
+    <pre class="term"><span class="cmd">$ oml</span>
+oml 0.1 · image restored — 42 objects, 17 skills
+talk to me. <span class="dim">(drop to Lisp with a leading form)</span>
+
+<span class="you">you&gt;</span> summarize project X and save it as a skill "weekly-x"
+<span class="oml">oml&gt;</span> done — saved skill weekly-x; next time just say "weekly X".
+
+<span class="you">you&gt;</span> (skills)
+=&gt; (:recall :note :weekly-x …)</pre>
+    <p class="cta"><a href="https://github.com/sm-th/oh-my-lisp">GitHub →</a></p>
+  </header>
+
+  <section class="why">
+    <div class="card">
+      <h2>A body that remembers</h2>
+      <p>A bare model forgets. oml is a persistent image — its objects, state, and
+      learned skills survive restarts. Yesterday's work is still here today.</p>
+    </div>
+    <div class="card">
+      <h2>It grows</h2>
+      <p>Every request is fulfilled by running Lisp in the image. When a workflow
+      works, it is kept as a named skill — so the longer you live with an image, the
+      better it understands you.</p>
+    </div>
+    <div class="card">
+      <h2>Natural language first</h2>
+      <p>You talk to it. Lisp is the precision layer underneath, there when you want
+      it. This is the difference between a toolkit and a companion.</p>
+    </div>
+    <div class="card">
+      <h2>Safe to inhabit</h2>
+      <p>The agent acts through a deny-by-default grant — a bounded vocabulary, not
+      ambient power. Safe to hand a capable but untrusted mind the keys.</p>
+    </div>
+  </section>
+
+  <section class="loop">
+    <h2>The loop</h2>
+    <pre class="flow">natural language
+  → the agent composes and runs Lisp in the image
+     → if it works, it is saved as a skill
+        → next time that intent is a known capability,
+           and your language is understood more richly</pre>
+    <p class="note">A plain assistant cannot do this — it has no persistent body in
+    which a vocabulary can accumulate. oml does.</p>
+  </section>
+
+  <footer>
+    <p>oml is <em>yours</em> — it starts small and gains capabilities by import.</p>
+    <p class="links"><a href="https://github.com/sm-th/oh-my-lisp">github.com/sm-th/oh-my-lisp</a></p>
+  </footer>
+</main>
