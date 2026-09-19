@@ -59,13 +59,9 @@
       "bad-version"
       (let [line (read-line)
             id (extract-id line)]
-        (write-response out id "{\"protocolVersion\":2,\"agentCapabilities\":{}}"))
-
-      "bad-version-alive"
-      (let [line (read-line)
-            id (extract-id line)]
         (write-response out id "{\"protocolVersion\":2,\"agentCapabilities\":{}}")
-        ;; Stay alive until the client closes stdin so cleanup is observable.
+        ;; Stay alive until the client closes stdin so the SDK observes the
+        ;; response before the process exits.
         (read-line)
         nil)
 
