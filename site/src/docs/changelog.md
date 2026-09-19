@@ -10,6 +10,11 @@ duplicate of git history.
 
 ## Unreleased
 
+- Implement Stage 1f ACP session close (#47).
+  - Add `oml.acp/close-session`, sending `session/close` when the agent advertised the capability and raising `:acp/capability` otherwise.
+  - Extend the fake ACP subprocess and behavior tests for supported and unsupported close.
+  - Document session close on the [ACP connection](/docs/acp-connection/) page and update this changelog.
+
 - Implement Stage 1e ACP turn cancellation (#45).
   - Add `oml.acp/cancel`, sending a `session/cancel` notification so an in-flight `prompt` (on another thread) returns with `:stop-reason :cancelled`.
   - Extend the fake ACP subprocess and behavior tests to cancel an in-flight turn.
