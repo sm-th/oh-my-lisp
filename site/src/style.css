@@ -1,153 +1,605 @@
+/*
+ * oml.sh visual system
+ *
+ * A small, tokenized palette and spacing/type scale shared by the home page
+ * and documentation. Built with plain CSS; no frameworks.
+ */
+
+/* --------------------------------------------------------------------------
+ * Tokens
+ * -------------------------------------------------------------------------- */
+
 :root {
-  --bg: #0f1115;
-  --fg: #e6e6e6;
-  --dim: #8a8f98;
-  --accent: #7dd3a0;
-  --card: #161922;
-  --line: #242836;
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  /* Background layers */
+  --color-page: #0c0e12;
+  --color-surface: #14171d;
+  --color-surface-raised: #1a1e26;
+  --color-code: #11141a;
+
+  /* Text (all normal text meets WCAG AA against --color-page) */
+  --color-text: #e8eaf0;
+  --color-text-secondary: #a8afba;
+  --color-text-muted: #7d8491;
+
+  /* Interactive / accent */
+  --color-link: #82d8b0;
+  --color-link-hover: #a8e6c8;
+  --color-accent: #7dd3a0;
+  --color-info: #7eb8ff;
+  --color-focus: #9ecfff;
+
+  /* Status */
+  --color-status: #7dd3a0;
+  --color-status-bg: #0f1f17;
+  --color-note: #7eb8ff;
+  --color-note-bg: #0f1824;
+
+  /* Borders */
+  --color-border: #2a2f3a;
+  --color-border-subtle: #1e222b;
+
+  /* Typography */
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-body: var(--font-mono);
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.35rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.5rem;
+
+  --leading-tight: 1.3;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.75;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* Layout */
+  --content-width: 720px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --focus-ring: 0 0 0 2px var(--color-page), 0 0 0 4px var(--color-focus);
 }
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+
+/* --------------------------------------------------------------------------
+ * Reset / base
+ * -------------------------------------------------------------------------- */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: var(--space-12);
+}
+
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font: 16px/1.6 var(--mono);
-  padding: 0 1.25rem;
+  background: var(--color-page);
+  color: var(--color-text);
+  font: var(--text-base)/var(--leading-normal) var(--font-body);
+  padding: 0 var(--space-5);
 }
-main { max-width: 720px; margin: 0 auto; padding: 4rem 0 6rem; }
+
+/* Focus states */
+a, button, input, textarea, select, [tabindex]:not([tabindex="-1"]) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* --------------------------------------------------------------------------
+ * Site nav
+ * -------------------------------------------------------------------------- */
 
 .site-nav {
-  max-width: 720px;
+  max-width: var(--content-width);
   margin: 0 auto;
-  padding: 1rem 0;
+  padding: var(--space-4) 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
+  gap: var(--space-3) var(--space-6);
   align-items: center;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.9rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: var(--text-sm);
 }
-.site-nav a { color: var(--dim); text-decoration: none; }
-.site-nav a:hover { color: var(--accent); text-decoration: underline; }
-.nav-brand { color: var(--fg) !important; font-weight: 700; }
-.nav-links { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
 
-.hero { text-align: left; }
+.site-nav a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  padding: var(--space-1) var(--space-2);
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
+  border-radius: var(--radius-sm);
+}
+
+.site-nav a:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.site-nav a[aria-current="page"] {
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--color-accent);
+  text-underline-offset: 0.2em;
+}
+
+.nav-brand {
+  color: var(--color-text) !important;
+  font-weight: 700;
+}
+
+.nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  align-items: center;
+}
+
+/* A subtle divider between project links and the external GitHub link. */
+.nav-links a:last-child {
+  position: relative;
+  margin-left: var(--space-2);
+}
+
+.nav-links a:last-child::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-3));
+  top: 0.25em;
+  bottom: 0.25em;
+  width: 1px;
+  background: var(--color-border);
+}
+
+@media (max-width: 640px) {
+  .site-nav {
+    gap: var(--space-3) var(--space-4);
+  }
+
+  .nav-links {
+    column-gap: var(--space-4);
+  }
+
+  .nav-links a:last-child {
+    margin-left: 0;
+  }
+
+  .nav-links a:last-child::before {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+ * Main containers
+ * -------------------------------------------------------------------------- */
+
+main, article, .docs-index {
+  max-width: var(--content-width);
+  margin: 0 auto;
+}
+
+main {
+  padding: var(--space-16) 0 var(--space-24);
+}
+
+article, .docs-index {
+  padding: var(--space-12) 0 var(--space-24);
+}
+
+/* --------------------------------------------------------------------------
+ * Typography
+ * -------------------------------------------------------------------------- */
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  line-height: var(--leading-tight);
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+p {
+  margin: 0 0 var(--space-4);
+}
+
+p:last-child {
+  margin-bottom: 0;
+}
+
+/* --------------------------------------------------------------------------
+ * Links
+ * -------------------------------------------------------------------------- */
+
+a {
+  color: var(--color-link);
+}
+
+a:hover {
+  color: var(--color-link-hover);
+}
+
+/* --------------------------------------------------------------------------
+ * Home page
+ * -------------------------------------------------------------------------- */
+
+.hero {
+  text-align: left;
+}
+
 .brand {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: var(--space-5);
 }
+
 .logo {
   width: 5.25rem;
   height: 5.25rem;
   flex: none;
 }
+
 .wordmark {
-  font-size: 3.5rem;
+  font-size: var(--text-3xl);
   font-weight: 700;
   letter-spacing: -0.03em;
-  color: var(--fg);
+  color: var(--color-text);
 }
-.tagline { color: var(--accent); font-size: 1.15rem; margin: 0.25rem 0 1.5rem; }
-.lead { font-size: 1.15rem; color: var(--fg); max-width: 40ch; }
 
-.term {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 1rem 1.1rem;
-  font-size: 0.86rem;
-  line-height: 1.5;
+.tagline {
+  color: var(--color-accent);
+  font-size: var(--text-lg);
+  font-style: italic;
+  margin: var(--space-2) 0 var(--space-6);
+}
+
+.lead {
+  font-size: var(--text-lg);
+  color: var(--color-text);
+  max-width: 44ch;
+  line-height: var(--leading-relaxed);
+}
+
+/* Terminal / code blocks */
+pre {
+  background: var(--color-code);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
   overflow-x: auto;
   white-space: pre;
-  margin: 2rem 0;
 }
-.term .cmd { color: var(--accent); }
-.term .dim { color: var(--dim); }
-.term .you { color: #6ea8fe; }
-.term .oml { color: var(--accent); }
 
-.cta a, .links a { color: var(--accent); text-decoration: none; }
-.cta a:hover, .links a:hover { text-decoration: underline; }
+.term {
+  margin: var(--space-8) 0;
+}
 
+.term .cmd { color: var(--color-accent); }
+.term .dim { color: var(--color-text-muted); }
+.term .you { color: var(--color-info); }
+.term .oml { color: var(--color-accent); }
+
+.cta {
+  margin: var(--space-6) 0 0;
+}
+
+.cta a {
+  color: var(--color-link);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.cta a:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+/* Feature cards */
 .why {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  margin: 4rem 0;
+  gap: var(--space-4);
+  margin: var(--space-16) 0;
 }
+
 .card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 1.1rem 1.2rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5) var(--space-6);
 }
-.card h2 { margin: 0 0 0.4rem; font-size: 1rem; color: var(--accent); }
-.card p { margin: 0; color: var(--dim); font-size: 0.92rem; }
 
-.loop h2 { font-size: 1rem; color: var(--accent); }
+.card h2 {
+  font-size: var(--text-base);
+  color: var(--color-accent);
+  margin: 0 0 var(--space-2);
+}
+
+.card p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+/* Loop section */
+.loop {
+  margin: var(--space-16) 0;
+}
+
+.loop h2 {
+  font-size: var(--text-xl);
+  color: var(--color-text);
+  margin-bottom: var(--space-4);
+}
+
 .flow {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 1rem 1.1rem;
-  font-size: 0.86rem;
-  color: var(--fg);
-  overflow-x: auto;
-  white-space: pre;
+  color: var(--color-text-secondary);
 }
-.note { color: var(--dim); font-size: 0.92rem; max-width: 52ch; }
 
-footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--line); color: var(--dim); }
-footer .links { font-size: 0.9rem; }
+.note {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  max-width: 56ch;
+  line-height: var(--leading-relaxed);
+}
 
-.docs-cta { margin-top: 4rem; }
-.docs-cta h2 { font-size: 1rem; color: var(--accent); }
-.docs-cta p { max-width: 60ch; color: var(--dim); }
-.docs-cta a { color: var(--accent); text-decoration: none; }
-.docs-cta a:hover { text-decoration: underline; }
+/* Docs CTA on home page */
+.docs-cta {
+  margin-top: var(--space-16);
+}
 
-article, .docs-index { max-width: 720px; margin: 0 auto; padding: 3rem 0 6rem; }
-article h1, .docs-index h1 { font-size: 2rem; margin: 0 0 0.5rem; }
-article h2, .docs-index h2 { font-size: 1.15rem; color: var(--accent); margin: 2rem 0 0.6rem; }
-article h3 { font-size: 1rem; color: var(--fg); margin: 1.5rem 0 0.4rem; }
-article p, article li { color: var(--dim); }
-article a { color: var(--accent); text-decoration: none; }
-article a:hover { text-decoration: underline; }
+.docs-cta h2 {
+  font-size: var(--text-xl);
+  color: var(--color-text);
+  margin-bottom: var(--space-3);
+}
+
+.docs-cta p {
+  max-width: 64ch;
+  color: var(--color-text-secondary);
+}
+
+.docs-cta a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.docs-cta a:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+/* Footer */
+footer {
+  margin-top: var(--space-16);
+  padding-top: var(--space-8);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+footer .links {
+  margin-top: var(--space-3);
+}
+
+footer .links a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+footer .links a:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+ * Documentation pages
+ * -------------------------------------------------------------------------- */
+
+article h1, .docs-index h1 {
+  font-size: var(--text-2xl);
+  margin: 0 0 var(--space-3);
+}
+
+article h2, .docs-index h2 {
+  font-size: var(--text-xl);
+  color: var(--color-accent);
+  margin: var(--space-10) 0 var(--space-3);
+}
+
+article h2:first-child, .docs-index h2:first-child {
+  margin-top: 0;
+}
+
+article h3 {
+  font-size: var(--text-lg);
+  color: var(--color-text);
+  margin: var(--space-8) 0 var(--space-2);
+}
+
+article p, article li {
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+article a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+article a:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 article code {
-  background: var(--card);
+  background: var(--color-surface-raised);
   padding: 0.15rem 0.35rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.9em;
+  color: var(--color-text);
 }
-article pre {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 1rem 1.1rem;
-  overflow-x: auto;
-  font-size: 0.86rem;
-  line-height: 1.5;
-}
-article pre code { background: transparent; padding: 0; }
-article ul, article ol { padding-left: 1.4rem; }
-article .status, article .note {
-  border-left: 3px solid var(--accent);
-  padding-left: 1rem;
-  margin: 1.5rem 0;
-  color: var(--dim);
-}
-.docs-index ul { list-style: none; padding-left: 0; }
-.docs-index li { margin: 0.4rem 0; }
-.docs-index a { color: var(--accent); text-decoration: none; }
-.docs-index a:hover { text-decoration: underline; }
 
-@media (max-width: 560px) {
-  .why { grid-template-columns: 1fr; }
-  .wordmark { font-size: 2.75rem; }
-  .logo { width: 4rem; height: 4rem; }
-  .brand { gap: 0.9rem; }
+article pre {
+  margin: var(--space-5) 0;
+}
+
+article pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+article ul, article ol {
+  padding-left: var(--space-6);
+}
+
+article li {
+  margin: var(--space-2) 0;
+}
+
+article blockquote {
+  margin: var(--space-6) 0;
+  padding: var(--space-4) var(--space-5);
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+article blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+article .status, article .note {
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  margin: var(--space-6) 0;
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+article .status {
+  background: var(--color-status-bg);
+  border-left: 3px solid var(--color-status);
+}
+
+article .note {
+  background: var(--color-note-bg);
+  border-left: 3px solid var(--color-note);
+}
+
+.docs-index ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.docs-index li {
+  margin: var(--space-3) 0;
+  color: var(--color-text-secondary);
+}
+
+.docs-index a {
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.docs-index a:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+ * Responsive
+ * -------------------------------------------------------------------------- */
+
+@media (max-width: 640px) {
+  body {
+    padding: 0 var(--space-4);
+  }
+
+  main {
+    padding: var(--space-10) 0 var(--space-16);
+  }
+
+  article, .docs-index {
+    padding: var(--space-8) 0 var(--space-16);
+  }
+
+  .brand {
+    gap: var(--space-4);
+  }
+
+  .wordmark {
+    font-size: var(--text-2xl);
+  }
+
+  .logo {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .tagline, .lead {
+    font-size: var(--text-base);
+  }
+
+  .why {
+    grid-template-columns: 1fr;
+  }
+
+  .loop h2, .docs-cta h2 {
+    font-size: var(--text-lg);
+  }
+
+  article h1, .docs-index h1 {
+    font-size: var(--text-xl);
+  }
+
+  article h2, .docs-index h2 {
+    font-size: var(--text-lg);
+    margin-top: var(--space-8);
+  }
+
+  article h3 {
+    font-size: var(--text-base);
+  }
+
+  pre {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-xs);
+  }
+}
+
+@media (max-width: 360px) {
+  .wordmark {
+    font-size: var(--text-xl);
+  }
+
+  .logo {
+    width: 3rem;
+    height: 3rem;
+  }
 }
