@@ -10,6 +10,11 @@ duplicate of git history.
 
 ## Unreleased
 
+- Implement Stage 1e ACP turn cancellation (#45).
+  - Add `oml.acp/cancel`, sending a `session/cancel` notification so an in-flight `prompt` (on another thread) returns with `:stop-reason :cancelled`.
+  - Extend the fake ACP subprocess and behavior tests to cancel an in-flight turn.
+  - Document cancellation on the [ACP connection](/docs/acp-connection/) page and update this changelog.
+
 - Implement Stage 1d ACP permission handling (#43).
   - Route `session/request_permission` to an optional `:on-permission` Lisp callback passed to `connect`, defaulting to a safe reject when unconfigured or when the callback throws.
   - Make the per-request timeout configurable via `connect` opts (`:request-timeout-ms`, default 120000) so real prompt turns are not cut off at 10 seconds.

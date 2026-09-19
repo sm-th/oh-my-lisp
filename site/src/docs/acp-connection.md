@@ -13,12 +13,13 @@ capabilities, and close the connection safely.
 ## Public interface
 
 The `oml.acp` namespace is a thin wrapper over the official ACP Java SDK
-(`com.agentclientprotocol:acp-core:0.16.0`). It exposes five functions:
+(`com.agentclientprotocol:acp-core:0.16.0`). It exposes six functions:
 
 - `(connect command args)` — launch a local agent and negotiate ACP v1.
 - `(capabilities conn)` — return the negotiated capabilities, including `:protocol-version`.
 - `(new-session conn cwd)` — create a session and return `{:session-id "..."}`.
 - `(prompt conn session-id text)` — send a prompt and return `{:stop-reason ... :updates [...]}`.
+- `(cancel conn session-id)` — cancel an in-flight turn via `session/cancel`.
 - `(close conn)` — close the connection idempotently with a bounded wait.
 
 `connect` accepts an executable `command`, a sequence of string `args`, and an optional
@@ -53,6 +54,10 @@ When the agent asks to perform an action it sends `session/request_permission`. 
 
 The callback receives `{:session-id <string> :options [{:option-id <string> :name <string> :kind <keyword>} ...]}` and returns the decision: an option-id string, or `:allow`, `:reject`, or `:cancel`. `:allow` and `:reject` select the first option of that kind. When no `:on-permission` is configured, or the callback throws, the request is rejected safely.
 
+## Cancellation
+
+`(cancel conn session-id)` sends a fire-and-forget `session/cancel` notification and returns `nil`. Because `prompt` blocks the calling thread, run it on another thread (for example a `future`) and call `cancel` from elsewhere; the in-flight `prompt` then returns `{:stop-reason :cancelled :updates [...]}` once the agent ends the turn.
+
 ## What the SDK owns
 
 The wrapper intentionally does not re-implement ACP mechanics. The official SDK is
@@ -66,11 +71,10 @@ responsible for:
 
 ## What this stage excludes
 
-The connection lifecycle currently implements connection, initialization, session creation, single-turn prompting, and permission handling. It does not yet implement:
+The connection lifecycle currently implements connection, initialization, session creation, single-turn prompting, permission handling, and turn cancellation. It does not yet implement:
 
 - Rich modeling of non-text `session/update` kinds (tool calls, plans) and non-text prompt content.
 - Grant or authorization design beyond the permission callback.
-- Turn cancellation (`session/cancel`).
 - Capability-gated `session/close`.
 - MCP injection, Lisp Eval exposure, or grant authorization.
 - Agent discovery, catalog generation, or startup integration.
