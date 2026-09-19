@@ -28,6 +28,23 @@ jobs:
       - run: npm install
       - run: npm run build
 
+  lockfile:
+    name: generate package-lock.json
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --package-lock-only
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-lock
+          path: site/package-lock.json
+
   markdown:
     name: lint markdown
     runs-on: ubuntu-latest
