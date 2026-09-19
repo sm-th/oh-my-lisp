@@ -2,7 +2,7 @@
 
 ## What oml is
 
-> **oml** (*oml is my lisp*) — a personal, persistent, self-evolving Lisp you drive
+> **oml** (*oh my lisp*) — a personal, persistent, self-evolving Lisp you drive
 > in natural language, and, when you want precision, in Lisp directly. An agent lives
 > in the image, acts through a bounded grant, and the image grows by keeping the
 > workflows that worked.

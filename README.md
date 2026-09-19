@@ -1,6 +1,6 @@
 # oh-my-lisp
 
-**`oml`** — *oml is my lisp*.
+**`oml`** — *oh my lisp*.
 
 > A personal, persistent, self-evolving Lisp you drive in natural language — and,
 > when you want precision, in Lisp directly. An agent lives in the image, acts
