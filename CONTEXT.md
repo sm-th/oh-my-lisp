@@ -29,6 +29,7 @@ The part of oml that decides when work is needed, selects configured behavior, s
 _Avoid_: agent harness, agent wrapper
 
 **Two-loop model**:
+
 1. **Lisp application loop:** decides when work is needed, selects configured behavior, sends an ACP prompt, consumes updates and the final outcome, and continues the application.
 2. **Coding-agent loop:** an external full coding agent owns model interaction, context management, tool selection and iteration, plus its native file, shell, git, pull-request, and skills capabilities.
 
