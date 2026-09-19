@@ -1,6 +1,6 @@
 # Repository guidance
 
-Start with the current GitHub issue and its acceptance criteria, then inspect the code, tests, and configuration that implement the affected surface. Those sources outrank the aspirational product descriptions in `README.md`, `docs/vision.md`, and `docs/architecture.md`.
+Start with the current GitHub issue and its acceptance criteria, then inspect the code, tests, and configuration that implement the affected surface. Those sources outrank the aspirational product descriptions in `README.md`, `site/src/docs/vision.md`, and `site/src/docs/architecture.md`.
 
 Use these canonical references instead of restating them:
 
@@ -18,6 +18,7 @@ Use these canonical references instead of restating them:
 - `flake.nix`: production package, development shell, and canonical JVM checks.
 - `site/`: Eleventy site and its package scripts.
 - `.github/workflows/`: required CI and Pages workflows.
-- `docs/`: product direction and agent-facing repository guidance.
+- `site/src/docs/`: public product and design documentation.
+- `docs/agents/`: agent-facing repository guidance.
 
 Treat `flake.nix`, `site/package.json`, `.markdownlint-cli2.jsonc`, and `.github/workflows/ci.yml` as the canonical definitions of executable checks. Follow `CONTRIBUTING.md` for when and where they run.
