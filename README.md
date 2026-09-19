@@ -23,7 +23,7 @@ you> (skills)
 
 ## Documents
 
-- [Vision](https://oml.sh/docs/vision/) — what oml is and why it matters.
+- [Vision](https://oml.sh/) — what oml is and why it matters (the home page).
 - [Architecture](https://oml.sh/docs/architecture/) — the current JVM foundation and
   intended core shape.
 - [ACP client architecture](https://oml.sh/docs/acp-architecture/) — accepted design
