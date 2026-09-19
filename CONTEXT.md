@@ -20,18 +20,37 @@ _Avoid_: dual-runtime support
 Lisp input is evaluated as written, without interpretation or rewriting by a language model.
 _Avoid_: agent-mediated eval
 
+**ACP**:
+The [Agent Client Protocol](https://agentclientprotocol.com/): the local stdio JSON-RPC boundary between oml and an external coding agent. oml is a thin client over the official ACP Java SDK; the SDK owns framing, request IDs, process mechanics, and the initialize handshake.
+_Avoid_: custom ACP implementation, wire-level re-implementation
+
+**Glue layer**:
+The part of oml that decides when work is needed, selects configured behavior, sends an ACP prompt, consumes updates and the final outcome, and continues the Lisp application. It does not embed or recreate the coding-agent loop.
+_Avoid_: agent harness, agent wrapper
+
+**Two-loop model**:
+
+1. **Lisp application loop:** decides when work is needed, selects configured behavior, sends an ACP prompt, consumes updates and the final outcome, and continues the application.
+2. **Coding-agent loop:** an external full coding agent owns model interaction, context management, tool selection and iteration, plus its native file, shell, git, pull-request, and skills capabilities.
+
+ACP is the boundary between the loops. The Lisp loop invokes a turn; the agent decides how to perform that turn.
+_Avoid_: single loop, built-in agent loop
+
 **Agent harness**:
-An external agent runner invoked by oml. OMP is the sole harness supported in the first version; the concept is not defined as OMP-specific so another harness can be added later.
-_Avoid_: oml, built-in agent
+An external coding agent invoked by oml through ACP. The harness is not part of oml; oml only owns the local subprocess lifetime and the ACP client handshake.
+_Avoid_: OMP, built-in agent, harness registry
+
+**ACP client**:
+The thin Clojure wrapper over the official ACP Java SDK (`com.agentclientprotocol:acp-core`). It connects to a configured local agent command, negotiates v1, exposes negotiated capabilities, and closes the connection idempotently.
+_Avoid_: custom transport, custom JSON-RPC
 
 **Bundled agent library**:
-The non-kernel library shipped with oml that exposes the agent API and the OMP adapter in the first version.
-_Avoid_: kernel primitive, harness registry
+The non-kernel library shipped with oml that exposes the ACP client and related glue-layer helpers. It does not embed agent model logic or native tool implementations.
+_Avoid_: kernel primitive, OMP adapter
 
 **External library**:
 An optional user-selected library, resolved through standard Clojure dependencies and loaded with `require`, that adds application-specific behavior.
 _Avoid_: kernel module, oml plugin
-
 
 **Lisp input**:
 In the default REPL, input beginning with `(` or explicitly marked `/eval`; it is sent to direct eval rather than natural-language handling. Custom configuration may define other input behavior.
@@ -46,23 +65,15 @@ Executable Lisp code loaded to extend an oml alongside its built-in REPL, includ
 _Avoid_: settings file, replacement main program
 
 **Grant**:
-The authority exposed through an eval surface. Configuration can define separate grants for the user and an agent; by default the user has full authority and the agent is restricted.
-_Avoid_: prompt instruction
-
-**Native tool policy**:
-The subset of an agent harness's own tools made available for one invocation. An enabled tool carries the ambient authority of the oml instance's host environment.
-_Avoid_: all-or-nothing tools, sandbox
-
-**Default agent profile**:
-The fallback authority for an agent invocation: native read, search, and edit tools plus restricted eval introspection, without an agent-controlled shell or network tool.
-_Avoid_: full harness defaults
+The authority exposed through an eval surface. Configuration can define separate grants for the user and an agent; by default the user has full authority and the agent is restricted. Grant design for agent-mediated eval is deferred and not a prerequisite for the ACP lifecycle.
+_Avoid_: prompt instruction, native tool policy
 
 **oml instance**:
 One running oml process together with the agent harnesses it invokes. Isolation between instances and coordination of a fleet belong to deployment and configuration, not to oml.
 _Avoid_: sandbox, fleet manager
 
 **Agent session**:
-An explicit Lisp value referring to a conversation owned by an agent harness. Configuration code owns its lifecycle and decides which requests share it.
+An explicit Lisp value referring to an ACP session owned by an external agent. Configuration code owns its lifecycle and decides which requests share it.
 _Avoid_: global current session, hidden conversation
 
 **Session key**:
@@ -70,9 +81,17 @@ A stable key chosen or derived by configuration code to associate an external co
 _Avoid_: display name
 
 **Agent run**:
-An explicit Lisp value representing one invocation in an agent session. Configuration code decides whether to await, observe, cancel, or run it alongside invocations in other sessions.
+An explicit Lisp value representing one ACP prompt turn in an agent session. Configuration code decides whether to await, observe, cancel, or run it alongside invocations in other sessions.
 _Avoid_: implicit background job
 
-**Agent queue**:
-The ordering mechanism owned by an agent harness session. Messages sent while work is active are delegated to the harness's native queue when available, rather than scheduled by oml.
-_Avoid_: oml work queue
+## Explicit exclusions
+
+The ACP client stage covered by issue #35 intentionally excludes:
+
+- `session/new`, `session/prompt`, `session/update` events, and the full turn lifecycle.
+- Permissions (`session/request_permission`), permission callbacks, and grants.
+- Turn cancellation (`session/cancel`) and pending-permission rejections.
+- `session/close` capability-gated close.
+- MCP injection, Lisp Eval exposure, and grant authorization.
+- Agent discovery, catalog/config generation, and startup/REPL integration.
+- Remote transports, providers, authentication, session persistence.

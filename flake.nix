@@ -31,10 +31,55 @@
             url = "https://repo.maven.apache.org/maven2/org/clojure/core.specs.alpha/0.4.74/core.specs.alpha-0.4.74.jar";
             hash = "sha256-63OsCM9JuoQMiLpnvu8RM2ylVDM9lAiAjXiUbg/rnds=";
           };
+          acpCoreJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/com/agentclientprotocol/acp-core/0.16.0/acp-core-0.16.0.jar";
+            hash = "sha256-SXJspF0b9nREJeEDVNtAo9YIvRcmP5RI0cjSqYoG8Tc=";
+          };
+          acpAnnotationsJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/com/agentclientprotocol/acp-annotations/0.16.0/acp-annotations-0.16.0.jar";
+            hash = "sha256-gjr5BOK8VmSDguYS8Bn+CSeRBSVQWX3lcjxBpJJa/pI=";
+          };
+          reactorCoreJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/io/projectreactor/reactor-core/3.8.7/reactor-core-3.8.7.jar";
+            hash = "sha256-ml8b/FrQQWpBD/Y76qJ5zDDC2jrpsRGmeMg8mSmKFVE=";
+          };
+          reactiveStreamsJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/org/reactivestreams/reactive-streams/1.0.4/reactive-streams-1.0.4.jar";
+            hash = "sha256-91yll3ibPaxY9hhXuawuEDSmj6Zy2zUFWo+0UJ4yXyg=";
+          };
+          jspecifyJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/org/jspecify/jspecify/1.0.0/jspecify-1.0.0.jar";
+            hash = "sha256-H61ua+dVd4Hk0zcp1Jrhzcj92m/kd7sMxozjUer9+6s=";
+          };
+          jacksonCoreJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-core/2.22.2/jackson-core-2.22.2.jar";
+            hash = "sha256-/xZ6Yxe+FYlXBsJmaPRbiY7+QKuHgJcGWCEP4Tk9UqY=";
+          };
+          jacksonDatabindJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.22.2/jackson-databind-2.22.2.jar";
+            hash = "sha256-0NoUwSsWtdVHGaoXLYO1Qv9Kvriw+320dv3ozuznYMo=";
+          };
+          jacksonAnnotationsJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/com/fasterxml/jackson/core/jackson-annotations/2.22/jackson-annotations-2.22.jar";
+            hash = "sha256-Id21mIB9OlGodnBOuXnZKW4cam9Hqxgm/4jG1qEnotA=";
+          };
+          slf4jApiJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/org/slf4j/slf4j-api/2.0.17/slf4j-api-2.0.17.jar";
+            hash = "sha256-e3UdlSBhlU1av+1xgcH2RdM2CRtnmJFZHWMynGIuuDI=";
+          };
           runtimeClasspath = pkgs.lib.concatStringsSep ":" [
             clojureJar
             specAlphaJar
             coreSpecsAlphaJar
+            acpCoreJar
+            acpAnnotationsJar
+            reactorCoreJar
+            reactiveStreamsJar
+            jspecifyJar
+            jacksonCoreJar
+            jacksonDatabindJar
+            jacksonAnnotationsJar
+            slf4jApiJar
           ];
           oml = pkgs.stdenvNoCC.mkDerivation {
             pname = "oml";
@@ -62,12 +107,13 @@
           };
           testRunner = pkgs.writeText "oml-test-runner.clj" ''
             (require 'clojure.test)
-            (require 'oml.core-test 'oml.kernel-test 'oml.repl-test)
+            (require 'oml.core-test 'oml.kernel-test 'oml.repl-test 'oml.acp-test)
             (let [{:keys [fail error]}
                   (clojure.test/run-tests
                     'oml.core-test
                     'oml.kernel-test
-                    'oml.repl-test)]
+                    'oml.repl-test
+                    'oml.acp-test)]
               (System/exit (if (zero? (+ fail error)) 0 1)))
           '';
           jvmTests = pkgs.runCommand "oml-jvm-tests" { } ''
