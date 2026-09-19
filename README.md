@@ -28,8 +28,6 @@ you> (skills)
   intended core shape.
 - [ACP client architecture](https://oml.sh/docs/acp-architecture/) — accepted design
   for the local ACP v1 client.
-- [Documentation policy](https://oml.sh/docs/documentation-policy/) — how behavior
-  changes and docs ship together.
 - [Changelog](https://oml.sh/docs/changelog/) — a lightweight record of notable
   changes.
 

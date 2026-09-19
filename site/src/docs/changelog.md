@@ -14,6 +14,5 @@ duplicate of git history.
   - Add a documentation source structure under `site/src/docs/`.
   - Publish the accepted ACP client architecture as a design/future-direction page.
   - Add a documentation landing page and site navigation.
-  - Record the same-PR documentation rule in contributor guidance and the published
-    docs.
+  - Record the same-PR documentation rule in contributor guidance.
   - Run the site build in GitHub Actions for documentation and code pull requests.
