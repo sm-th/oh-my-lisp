@@ -27,6 +27,11 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-${{ github.run_id }}-${{ github.run_attempt }}
+          path: site/_site
+          if-no-files-found: error
 
   markdown:
     name: lint markdown
