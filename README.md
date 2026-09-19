@@ -45,8 +45,8 @@ running.
 The first argument, when given, is an init file — executable Clojure, not a
 declarative config:
 
-```console
-$ bin/oml ~/.oml/init.clj
+```sh
+bin/oml ~/.oml/init.clj
 ```
 
 Its forms are evaluated once, in order, before the REPL starts, into the same
@@ -60,9 +60,9 @@ Init extends the running image — it never replaces the built-in REPL.
 
 ## Tests
 
-```console
-$ clojure -M:test          # all tests
-$ clojure -M:test -n oml.kernel-test   # one namespace
+```sh
+clojure -M:test                       # all tests
+clojure -M:test -n oml.kernel-test    # one namespace
 ```
 
 ## Status
