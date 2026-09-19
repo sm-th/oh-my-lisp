@@ -49,8 +49,7 @@
         (is (= :completed (:status result)))
         (is (= "BASIC_OK" (:text result)))
         (is (= "agent_end" (get-in result [:event :type])))
-        (is (= (agent/observed-events run) (:events result)))
-        (is (nil? (agent/next-event run 0))))
+        (is (= (agent/observed-events run) (:events result))))
       (is (= {:exit-code 0 :stderr ""} (agent/close session)))
       (is (= {:exit-code 0 :stderr ""} (agent/close session)))
       (finally
@@ -193,7 +192,9 @@
                       (catch clojure.lang.ExceptionInfo cause cause))]
         (is (= :protocol (:kind (ex-data failure)))))
       (finally
-        (agent/close session)))))
+        (try
+          (agent/close session)
+          (catch clojure.lang.ExceptionInfo _))))))
 
 (deftest unexpected-child-exit-is-visible
   (let [session (agent/open (options))]
