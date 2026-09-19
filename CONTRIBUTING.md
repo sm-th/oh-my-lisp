@@ -1,6 +1,6 @@
 # Contributing
 
-Repository work starts from a GitHub issue. The issue and its acceptance criteria define the change; current code, tests, and configuration define existing behavior. Treat `README.md`, `docs/vision.md`, and `docs/architecture.md` as direction rather than implemented specification.
+Repository work starts from a GitHub issue. The issue and its acceptance criteria define the change; current code, tests, and configuration define existing behavior. Treat `README.md`, `site/src/docs/vision.md`, and `site/src/docs/architecture.md` as direction rather than implemented specification.
 
 Follow the repository issue and pull-request procedure in `docs/agents/issue-tracker.md`. An issue is a planning and specification unit; a pull request is a focused review and integration unit; a branch and worktree isolate a concurrent pull request. One pull request normally closes one issue, but splitting an issue across multiple pull requests or combining multiple issues in one pull request requires an explicit owner-recorded decision.
 
@@ -10,7 +10,7 @@ Repository tests, checks, and builds run only in GitHub Actions. Do not run vali
 
 After pushing, inspect every check on the pull request and open the job logs for failures. Report the check names and outcomes in the pull request. A change is ready for review when its acceptance criteria are met and all required checks pass.
 
-`.github/workflows/ci.yml` defines required CI jobs. `flake.nix` defines the JVM production build and tests run by the `nix flake check` job; `site/package.json` and `.markdownlint-cli2.jsonc` define the other checked surfaces. Run the checkout-local program with `bin/oml`; its optional init-file behavior is defined by `src/oml/core.clj`.
+`.github/workflows/ci.yml` defines required CI jobs. `flake.nix` defines the production build, JVM tests, and documentation site build run by the `nix flake check` job; `site/package.json` and `.markdownlint-cli2.jsonc` define the other checked surfaces. Run the checkout-local program with `bin/oml`; its optional init-file behavior is defined by `src/oml/core.clj`.
 
 ## Documentation and change tracking
 
