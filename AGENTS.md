@@ -15,8 +15,9 @@ Use these canonical references instead of restating them:
 - `test/oml/`: tests corresponding to the runtime namespaces.
 - `bin/oml`: checkout-local launcher.
 - `deps.edn`: Clojure dependencies, entry point, and test aliases.
+- `flake.nix`: production package, development shell, and canonical JVM checks.
 - `site/`: Eleventy site and its package scripts.
 - `.github/workflows/`: required CI and Pages workflows.
 - `docs/`: product direction and agent-facing repository guidance.
 
-Treat `deps.edn`, `site/package.json`, and `.github/workflows/ci.yml` as the canonical definitions of executable commands. Follow `CONTRIBUTING.md` for when and where they run.
+Treat `flake.nix`, `site/package.json`, `.markdownlint-cli2.jsonc`, and `.github/workflows/ci.yml` as the canonical definitions of executable checks. Follow `CONTRIBUTING.md` for when and where they run.
