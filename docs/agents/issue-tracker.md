@@ -13,6 +13,21 @@ Read sources in this order:
 
 When those sources disagree, follow the higher source and keep the pull request limited to its approved scope. Record a material scope decision on every affected issue or the pull request so reviewers can evaluate the same specification.
 
+## Write a self-contained issue
+
+Create new issues from the templates in `.github/ISSUE_TEMPLATE/`. An issue must be executable by someone with no access to prior chat or session context, so it relies only on durable artifacts: repository files, linked issues, and official specifications. Never reference chat transcripts, session state, or other ephemeral context.
+
+Reuse the **Implementation task** template skeleton and fill every section:
+
+- **Goal** — the value delivered and the design or authority issue it serves.
+- **Execution context (read first)** — links to the durable guidance above plus the affected files and the `.github/workflows/ci.yml` jobs that validate the change; do not restate that guidance.
+- **Public API / contract** — the signatures, types, semantics, and error behavior a consumer observes.
+- **Scope** — the concrete work.
+- **Acceptance criteria** — a checklist that doubles as the Definition of Done, with every item observable and testable.
+- **Non-goals** — the explicit boundaries that keep the change a focused vertical slice.
+
+Use the **Design record** template for discussion-only architecture decisions.
+
 ## Deliver a focused pull request
 
 One issue may be split across multiple focused pull requests, and one focused pull request may combine multiple issues, only when the owner records that decision. Otherwise, one pull request normally closes one issue.

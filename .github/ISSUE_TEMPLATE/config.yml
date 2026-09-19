@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contribution and workflow guide
+    url: https://github.com/sm-th/oh-my-lisp/blob/main/CONTRIBUTING.md
+    about: Read the contribution sequence and CI-only verification policy before opening an issue.
