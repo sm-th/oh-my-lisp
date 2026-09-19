@@ -10,6 +10,10 @@ description: "What oml is and why it matters."
 > in the image, acts through a bounded grant, and the image grows by keeping the
 > workflows that worked.
 
+*This is the north star — where oml is heading. For the accepted design, and for what
+has shipped so far, see the [Architecture](/docs/architecture/) and the
+[Changelog](/docs/changelog/).*
+
 ## Why it matters
 
 - **Natural language first.** You talk to it. Without that, it is a REPL for hackers;
