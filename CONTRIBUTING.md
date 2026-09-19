@@ -2,7 +2,7 @@
 
 Repository work starts from a GitHub issue. The issue and its acceptance criteria define the change; current code, tests, and configuration define existing behavior. Treat `README.md`, `docs/vision.md`, and `docs/architecture.md` as direction rather than implemented specification.
 
-Follow the repository issue and pull-request procedure in `docs/agents/issue-tracker.md`. Use one branch, one worktree, and one pull request for each issue so its diff and verification stay focused.
+Follow the repository issue and pull-request procedure in `docs/agents/issue-tracker.md`. An issue is a planning and specification unit; a pull request is a focused review and integration unit; a branch and worktree isolate a concurrent pull request. One pull request normally closes one issue, but splitting an issue across multiple pull requests or combining multiple issues in one pull request requires an explicit owner-recorded decision.
 
 ## Verification
 
