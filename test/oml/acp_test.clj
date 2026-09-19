@@ -124,6 +124,25 @@
         (str "close of hanging agent took " elapsed " ms; expected bounded"))
     (is (boolean? closed?))))
 
+(deftest new-session-returns-session-id
+  (let [conn (connect-fake "session-ok")
+        session (acp/new-session conn "/tmp")]
+    (is (string? (:session-id session)))
+    (is (seq (:session-id session)))
+    (acp/close conn)))
+
+(deftest new-session-failure-yields-stable-error
+  (let [conn (connect-fake "session-error")
+        ex (try
+             (acp/new-session conn "/tmp")
+             nil
+             (catch clojure.lang.ExceptionInfo e e))]
+    (is (some? ex) "expected new-session to throw on an agent-reported failure")
+    (is (contains? #{:acp/protocol :acp/agent :acp/connection} (:oml/error (ex-data ex))))
+    (is (not= :acp/unknown (:oml/error (ex-data ex))))
+    (is (instance? Throwable (.getCause ^Throwable ex)))
+    (acp/close conn)))
+
 (defn -main
   "Entry point for running this namespace standalone."
   [& _]

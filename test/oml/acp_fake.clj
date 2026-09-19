@@ -64,6 +64,33 @@
         (flush)
         (debug! (str "response:" response))))))
 
+(defn- reply-result
+  "Read one request line and write a JSON-RPC result, echoing the id verbatim."
+  [result-json]
+  (let [line (read-line)]
+    (debug! (str "request:" line))
+    (when (some? line)
+      (let [id (request-id line)
+            response (str "{\"jsonrpc\":\"2.0\",\"id\":" id ",\"result\":" result-json "}")]
+        (print response)
+        (print "\n")
+        (flush)
+        (debug! (str "response:" response))))))
+
+(defn- reply-error
+  "Read one request line and write a JSON-RPC error, echoing the id verbatim."
+  [code message]
+  (let [line (read-line)]
+    (debug! (str "request:" line))
+    (when (some? line)
+      (let [id (request-id line)
+            response (str "{\"jsonrpc\":\"2.0\",\"id\":" id
+                          ",\"error\":{\"code\":" code ",\"message\":\"" message "\"}}")]
+        (print response)
+        (print "\n")
+        (flush)
+        (debug! (str "response:" response))))))
+
 (defn- run-behavior
   [behavior]
   (write-pid)
@@ -78,6 +105,12 @@
     "early-exit" (System/exit 1)
     "hang" (do (respond 1 "{}")
                (Thread/sleep Long/MAX_VALUE))
+    "session-ok" (do (respond 1 ok-capabilities)
+                     (reply-result "{\"sessionId\":\"sess-abc-123\"}")
+                     ;; Stay alive until the client closes stdin so close is graceful.
+                     (read-line))
+    "session-error" (do (respond 1 ok-capabilities)
+                        (reply-error -32000 "cwd does not exist"))
     (do (binding [*out* *err*]
           (println "unknown behavior:" behavior))
         (System/exit 2))))
