@@ -96,7 +96,7 @@
             pname = "oml-site";
             version = "0.1.0";
             src = ./site;
-            npmDepsHash = pkgs.lib.fakeHash;
+            npmDepsHash = "sha256-w5lFWRkLz/Sk/e4Jm4t4I+oq6wKQpBYWe8jxOb0apTw=";
             buildPhase = ''
               npm run build
             '';
