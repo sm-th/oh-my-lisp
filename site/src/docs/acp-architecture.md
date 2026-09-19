@@ -6,8 +6,9 @@ description: "Accepted design for the oh-my-lisp ACP v1 client."
 # ACP client architecture
 
 <p class="status">
-<strong>Status:</strong> Accepted design record. This page describes a planned
-future direction, not shipped behavior. Implementation is staged in later issues.
+<strong>Status:</strong> Accepted design record. Stage 1a (local stdio connection
+and v1 initialization) is implemented. Later Stage 1 children (sessions, prompt
+turns, permissions, cancellation, close) are planned and tracked in GitHub issues.
 </p>
 
 ## Decision
@@ -34,8 +35,13 @@ how to perform that turn.
 
 - Lisp application behavior and user-facing integration.
 - Explicit Lisp configuration and selection of a local agent command.
-- Local subprocess lifetime and ACP v1 JSON-RPC over stdio.
-- Protocol-version and capability negotiation.
+- Local subprocess lifetime and ACP v1 JSON-RPC over stdio, **carried by the official
+  Apache-2.0 ACP Java SDK** (`com.agentclientprotocol:acp-core:0.16.0`). oml is a thin
+  Clojure-facing wrapper over the SDK's synchronous stdio client and transport; the SDK
+  owns JSON framing, UTF-8 handling, request/response correlation, stderr handling, and
+  subprocess reaping, and oml verifies those behaviors rather than re-implementing them.
+- Protocol-version and capability negotiation through the SDK's `initialize` handshake,
+  exposed to later children as Clojure-facing values.
 - Session creation, prompt submission, update delivery, cancellation, final stop-reason
   handling, and predictable shutdown.
 - An instance-configured Lisp permission handler.
@@ -55,7 +61,8 @@ agent that does.
 The first protocol implementation is local only:
 
 1. Launch one configured agent process.
-2. Exchange newline-delimited JSON-RPC over stdin/stdout.
+2. Exchange newline-delimited JSON-RPC over stdin/stdout, carried by the SDK's stdio
+   transport rather than hand-written in oml.
 3. Call `initialize` and retain the negotiated version and capabilities.
 4. Create a session with `session/new`.
 5. Keep `session/prompt` pending while delivering `session/update` notifications.
@@ -67,6 +74,22 @@ The first protocol implementation is local only:
 
 No client filesystem or terminal callbacks are advertised in v1. The selected coding
 agent uses its own tools.
+
+## Current scope: Stage 1a
+
+Issue #35 delivers the first reviewed slice:
+
+- `oml.acp/connect` launches a configured command, creates the SDK stdio transport and
+  sync client, and completes the `initialize` handshake.
+- `oml.acp/capabilities` returns the negotiated capabilities as a Clojure map, including
+  `:protocol-version`.
+- `oml.acp/close` closes the connection idempotently and with a bounded wait.
+- SDK failures are translated into stable `ex-info` categories under `:oml/error`:
+  `:acp/connection`, `:acp/protocol`, `:acp/capability`, and `:acp/unknown`.
+
+This stage deliberately does **not** implement sessions, prompts, events, permissions,
+cancellation, MCP, Lisp Eval, grants, discovery, remote transports, or provider/auth
+configuration.
 
 ## Configuration, absence, and discovery
 
@@ -106,8 +129,13 @@ stages, and no implementation issue is open for them now.
 ## Staged delivery
 
 - **Stage 0** — establish and merge the documentation-site workflow and publish this
-  design. No coding pull request starts before Stage 0 is reviewed and merged.
+  design. (Merged.)
 - **Stage 1** — local ACP v1 client lifecycle.
+  - **1a** — connect and initialize v1 (#35, implemented).
+  - **1b** — `session/new` and session lifecycle.
+  - **1c** — `session/prompt`, updates, and stop reasons.
+  - **1d** — permission handling.
+  - **1e** — cancellation and graceful close.
 - **Stage 2** — maintained catalog, Lisp configuration generation, and startup behavior;
   depends on Stage 1.
 

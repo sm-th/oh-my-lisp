@@ -10,6 +10,18 @@ duplicate of git history.
 
 ## Unreleased
 
+- Implement Stage 1a ACP local stdio connection (#35).
+  - Add `oml.acp/connect`, `oml.acp/capabilities`, and `oml.acp/close` as a thin
+    wrapper over the official ACP Java SDK (`com.agentclientprotocol:acp-core:0.16.0`).
+  - Translate SDK failures into stable `ex-info` categories under `:oml/error`.
+  - Add behavior tests with a real fake ACP subprocess covering successful initialize,
+    protocol-version mismatch, malformed frame, unexpected exit, double close, and
+    bounded shutdown of a hanging agent.
+  - Add the SDK and its runtime transitive dependencies to `deps.edn` and the closed
+    Nix dependency set.
+  - Publish the [ACP connection](/docs/acp-connection/) page and update the ACP
+    architecture status, site navigation, and this changelog.
+
 - Polish the documentation site's visual design and navigation.
   - Introduce an explicit, accessible palette and spacing/type tokens in `site/src/style.css`.
   - Add current-page navigation markers, focus-visible states, and clearer navbar grouping.
