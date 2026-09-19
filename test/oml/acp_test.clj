@@ -213,6 +213,17 @@
         "a throwing callback should fall back to safe reject")
     (acp/close conn)))
 
+(deftest cancel-ends-in-flight-turn-as-cancelled
+  (let [conn (connect-fake "prompt-cancel")
+        sid (:session-id (acp/new-session conn "/tmp"))
+        fut (future (acp/prompt conn sid "long task"))]
+    (Thread/sleep 300)
+    (is (nil? (acp/cancel conn sid)))
+    (let [result (deref fut 15000 ::timeout)]
+      (is (not= ::timeout result) "prompt should return after cancel")
+      (is (= :cancelled (:stop-reason result)))
+      (acp/close conn))))
+
 (defn -main
   "Entry point for running this namespace standalone."
   [& _]

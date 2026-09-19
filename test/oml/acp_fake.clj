@@ -160,6 +160,27 @@
             (flush)
             (debug! (str "response:" response))))))))
 
+(defn- reply-prompt-await-cancel
+  "Read a session/prompt request, stream a chunk, wait for the client's session/cancel
+  notification, then complete the turn as cancelled."
+  []
+  (let [line (read-line)]
+    (debug! (str "request:" line))
+    (when (some? line)
+      (let [id (request-id line)]
+        (notify (agent-chunk-notification "working"))
+        (loop []
+          (let [l (read-line)]
+            (debug! (str "await-cancel:" l))
+            (when (and (some? l) (not (.contains l "session/cancel")))
+              (recur))))
+        (let [response (str "{\"jsonrpc\":\"2.0\",\"id\":" id
+                            ",\"result\":{\"stopReason\":\"cancelled\"}}")]
+          (print response)
+          (print "\n")
+          (flush)
+          (debug! (str "response:" response)))))))
+
 (defn- run-behavior
   [behavior]
   (write-pid)
@@ -195,6 +216,10 @@
                             (reply-session)
                             (reply-prompt-with-permission "end_turn")
                             (read-line))
+    "prompt-cancel" (do (respond 1 ok-capabilities)
+                        (reply-session)
+                        (reply-prompt-await-cancel)
+                        (read-line))
     (do (binding [*out* *err*]
           (println "unknown behavior:" behavior))
         (System/exit 2))))

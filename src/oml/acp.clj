@@ -18,7 +18,7 @@
     AcpSchema$SessionNotification AcpSchema$AgentMessageChunk AcpSchema$AgentThoughtChunk
     AcpSchema$UserMessageChunk AcpSchema$RequestPermissionRequest AcpSchema$RequestPermissionResponse
     AcpSchema$PermissionOption AcpSchema$PermissionOptionKind AcpSchema$PermissionSelected
-    AcpSchema$PermissionCancelled AcpClientSession$AcpError]
+    AcpSchema$PermissionCancelled AcpSchema$CancelNotification AcpClientSession$AcpError]
    [java.time Duration]
    [java.util.concurrent ConcurrentLinkedQueue]
    [java.util.function Consumer Function]))
@@ -325,6 +325,22 @@
         (drain-settle q)
         {:stop-reason (stop-reason->kw (.stopReason resp))
          :updates (vec (.toArray q))}))
+    (catch clojure.lang.ExceptionInfo e
+      (throw e))
+    (catch Throwable t
+      (wrap-error t))))
+
+(defn cancel
+  "Cancel the in-flight turn for `session-id` on `conn`.
+
+  Sends a fire-and-forget `session/cancel` notification and returns nil. An
+  in-flight `prompt` for the session (running on another thread) then returns with
+  :stop-reason :cancelled once the agent ends the turn. Throws ex-info tagged with
+  :oml/error on a wrapper-level failure."
+  [^Connection conn ^String session-id]
+  (try
+    (.cancel ^AcpSyncClient (:client conn) (AcpSchema$CancelNotification. session-id))
+    nil
     (catch clojure.lang.ExceptionInfo e
       (throw e))
     (catch Throwable t
