@@ -10,6 +10,11 @@ duplicate of git history.
 
 ## Unreleased
 
+- Implement Stage 1b ACP session creation (#39).
+  - Add `oml.acp/new-session`, sending `session/new` through the SDK and returning `{:session-id "..."}`.
+  - Extend the fake ACP subprocess and behavior tests to cover session-creation success and agent-reported failure.
+  - Document `new-session` on the [ACP connection](/docs/acp-connection/) page and update this changelog.
+
 - Implement Stage 1a ACP local stdio connection (#35).
   - Add `oml.acp/connect`, `oml.acp/capabilities`, and `oml.acp/close` as a thin
     wrapper over the official ACP Java SDK (`com.agentclientprotocol:acp-core:0.16.0`).

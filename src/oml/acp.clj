@@ -12,6 +12,7 @@
    [com.agentclientprotocol.sdk.client.transport AgentParameters StdioAcpClientTransport]
    [com.agentclientprotocol.sdk.error AcpCapabilityException AcpConnectionException
     AcpException AcpProtocolException]
+   [com.agentclientprotocol.sdk.spec AcpSchema$NewSessionRequest AcpSchema$NewSessionResponse]
    [java.time Duration]))
 
 (def ^:private default-request-timeout
@@ -149,6 +150,22 @@
            :protocol-version (:protocol-version conn))
     (throw (ex-info "ACP connection not initialized"
                     {:oml/error :acp/protocol}))))
+
+(defn new-session
+  "Create a new ACP session on `conn` with working directory `cwd`.
+
+  `cwd` is an absolute-path string naming the agent's working directory. Sends
+  `session/new` through the SDK's synchronous client and returns an immutable map
+  {:session-id \"<id>\"}. Throws ex-info tagged with :oml/error on failure."
+  [^Connection conn ^String cwd]
+  (try
+    (let [req (AcpSchema$NewSessionRequest. cwd nil nil nil)
+          ^AcpSchema$NewSessionResponse resp (.newSession ^AcpSyncClient (:client conn) req)]
+      {:session-id (.sessionId resp)})
+    (catch clojure.lang.ExceptionInfo e
+      (throw e))
+    (catch Throwable t
+      (wrap-error t))))
 
 (defn close
   "Close `conn` idempotently and with a bounded wait.
