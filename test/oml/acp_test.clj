@@ -86,7 +86,7 @@
   (let [pid-file (File/createTempFile "acp-fake" ".pid")]
     (.deleteOnExit pid-file)
     (try
-      (connect-fake "bad-version" {"ACP_FAKE_PID_FILE" (.getPath pid-file)})
+      (connect-fake "bad-version-alive" {"ACP_FAKE_PID_FILE" (.getPath pid-file)})
       (is false "expected connect to throw")
       (catch Throwable _))
     (is (false? (wait-for-process-death pid-file 6000))

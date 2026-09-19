@@ -42,9 +42,8 @@
 
 (defn- write-response
   [out id result]
-  (binding [*out* out]
-    (printf "{\"jsonrpc\":\"2.0\",\"id\":\"%s\",\"result\":%s}%n" id result)
-    (flush)))
+  (.write out (format "{\"jsonrpc\":\"2.0\",\"id\":\"%s\",\"result\":%s}%n" id result))
+  (.flush out))
 
 (defn -main
   "Run one scripted ACP stdio behavior."
@@ -58,6 +57,11 @@
         (write-response out id ok-response))
 
       "bad-version"
+      (let [line (read-line)
+            id (extract-id line)]
+        (write-response out id "{\"protocolVersion\":2,\"agentCapabilities\":{}}"))
+
+      "bad-version-alive"
       (let [line (read-line)
             id (extract-id line)]
         (write-response out id "{\"protocolVersion\":2,\"agentCapabilities\":{}}")
