@@ -8,7 +8,9 @@ description: "Notable changes to the oh-my-lisp project."
 This page records notable changes to oh-my-lisp. It is a high-level summary, not a
 duplicate of git history.
 
-## Unreleased
+## 0.1.0 — 2026-09-19
+
+First tagged release: a complete local ACP v1 client over the official ACP Java SDK.
 
 - Implement Stage 1f ACP session close (#47).
   - Add `oml.acp/close-session`, sending `session/close` when the agent advertised the capability and raising `:acp/capability` otherwise.

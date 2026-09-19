@@ -33,4 +33,11 @@ you> (skills)
 
 ## Status
 
-Early. Design first — see the documents above. Work happens in issues and pull requests.
+Early, and now runnable. The **v0.1.0** release delivers a local ACP v1 client —
+connect, sessions, prompts with streamed updates, permissions, cancellation, and
+capability-gated close — over the official ACP Java SDK. Design first; work happens
+in issues and pull requests.
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).

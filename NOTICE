@@ -1,0 +1,8 @@
+oh-my-lisp (oml)
+Copyright 2026 Andy Smith
+
+This product is licensed under the Apache License, Version 2.0.
+
+oml builds on the official Agent Client Protocol Java SDK
+(com.agentclientprotocol:acp-core), which is also licensed under the
+Apache License, Version 2.0.
