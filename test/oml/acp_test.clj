@@ -57,7 +57,12 @@
           alive?)))))
 
 (deftest connect-negotiates-v1-and-exposes-capabilities
-  (let [conn (connect-fake "ok")
+  (let [dbg (doto (File/createTempFile "acp-fake" ".log") .deleteOnExit)
+        conn (try
+               (connect-fake "ok" {"ACP_FAKE_DEBUG" (.getPath dbg)})
+               (catch Throwable t
+                 (println "ACP_FAKE_DEBUG:\n" (when (.isFile dbg) (slurp dbg)))
+                 (throw t)))
         caps (acp/capabilities conn)]
     (is (= 1 (:protocol-version caps)))
     (is (:load-session caps))
