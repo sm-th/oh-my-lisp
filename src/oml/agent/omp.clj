@@ -255,10 +255,12 @@
         "response" (if-let [response (get @(:pending connection) (:id frame))]
                      (deliver response frame)
                      (when-not (:success frame)
-                       (run-error! @(:active-run connection)
-                                   (response-error {:id (:id frame)
-                                                    :type (:command frame)}
-                                                   frame))))
+                       (when-let [run @(:active-run connection)]
+                         (run-error! run
+                                     (response-error {:id (:id frame)
+                                                      :type (:command frame)}
+                                                     frame))
+                         (compare-and-set! (:active-run connection) run nil))))
         "host_tool_call" (do (record-event! connection frame)
                               (invoke-eval! connection frame))
         "host_tool_cancel" (do
@@ -507,14 +509,21 @@
     (when-not (identical? run @(:active-run connection))
       (throw (error "OMP run is no longer active"
                     {:kind :inactive-run :run-id (:id run)})))
-    (:data (command! connection {:type "abort"}))))
+    (command! connection {:type "abort"})
+    {:accepted true}))
+
+(defn- checked-exit [value]
+  (when-not (zero? (:exit-code value))
+    (throw (error "OMP process exited non-zero"
+                  (assoc value :kind :exit))))
+  value)
 
 (defn close [^OmpConnection connection]
   (if-let [value @(:closed connection)]
-    value
+    (checked-exit value)
     (locking connection
       (if-let [value @(:closed connection)]
-        value
+        (checked-exit value)
         (do
           (reset! (:accepting connection) false)
           (when-let [run @(:active-run connection)]
@@ -535,7 +544,4 @@
             (let [value {:exit-code (.exitValue process)
                          :stderr (stderr-text connection)}]
               (reset! (:closed connection) value)
-              (when-not (zero? (:exit-code value))
-                (throw (error "OMP process exited non-zero"
-                              (assoc value :kind :exit))))
-              value)))))))
+              (checked-exit value))))))))

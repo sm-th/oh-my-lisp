@@ -97,7 +97,7 @@
   (let [session (agent/open (options))]
     (try
       (let [run (agent/send session "cancel")]
-        (is (= {:aborted true} (agent/cancel run)))
+        (is (= {:accepted true} (agent/cancel run)))
         (let [result (agent/result run)]
           (is (= :aborted (:status result)))
           (is (some #(= "host_tool_cancel" (:type %)) (:events result)))))

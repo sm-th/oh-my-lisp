@@ -91,8 +91,9 @@
   (omp/result (:implementation run)))
 
 (defn cancel
-  "Ask OMP to abort the active native run. Returns OMP's acknowledgement.
-  OMP cancellation is cooperative; a caller-supplied eval may not stop."
+  "Ask OMP to abort the active native run. Returns `{:accepted true}` after
+  OMP acknowledges the command. Cancellation is cooperative; a caller-supplied
+  eval may not stop."
   [^Run run]
   (omp/cancel (:implementation run)))
 
