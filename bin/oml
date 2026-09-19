@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# oml — start the built-in REPL from a repository checkout.
+#
+# usage: bin/oml [init-file]
+#
+# The init file path is resolved relative to the caller's working
+# directory; the JVM project itself is found relative to this script.
+set -euo pipefail
+
+oml_home="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ $# -gt 0 && "$1" != /* ]]; then
+  set -- "$PWD/$1" "${@:2}"
+fi
+
+cd -- "$oml_home"
+exec clojure -M:oml "$@"
