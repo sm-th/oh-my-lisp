@@ -64,14 +64,18 @@
         (flush)
         (debug! (str "response:" response))))))
 
-(defn- reply-result
-  "Read one request line and write a JSON-RPC result, echoing the id verbatim."
-  [result-json]
+(defn- reply-session
+  "Read a session/new request; require an mcpServers array (real ACP agents crash on a
+  missing one) and reply with a session id, or a JSON-RPC error when it is absent."
+  []
   (let [line (read-line)]
     (debug! (str "request:" line))
     (when (some? line)
       (let [id (request-id line)
-            response (str "{\"jsonrpc\":\"2.0\",\"id\":" id ",\"result\":" result-json "}")]
+            response (if (.contains line "\"mcpServers\":[")
+                       (str "{\"jsonrpc\":\"2.0\",\"id\":" id ",\"result\":{\"sessionId\":\"sess-abc-123\"}}")
+                       (str "{\"jsonrpc\":\"2.0\",\"id\":" id
+                            ",\"error\":{\"code\":-32602,\"message\":\"missing mcpServers array\"}}"))]
         (print response)
         (print "\n")
         (flush)
@@ -86,6 +90,39 @@
       (let [id (request-id line)
             response (str "{\"jsonrpc\":\"2.0\",\"id\":" id
                           ",\"error\":{\"code\":" code ",\"message\":\"" message "\"}}")]
+        (print response)
+        (print "\n")
+        (flush)
+        (debug! (str "response:" response))))))
+
+(defn- agent-chunk-notification
+  "A session/update notification carrying an agent_message_chunk with `text`."
+  [text]
+  (str "{\"jsonrpc\":\"2.0\",\"method\":\"session/update\","
+       "\"params\":{\"sessionId\":\"sess-abc-123\","
+       "\"update\":{\"sessionUpdate\":\"agent_message_chunk\","
+       "\"content\":{\"type\":\"text\",\"text\":\"" text "\"}}}}"))
+
+(defn- notify
+  "Write a JSON-RPC notification line (no id)."
+  [json]
+  (print json)
+  (print "\n")
+  (flush)
+  (debug! (str "notify:" json)))
+
+(defn- reply-prompt
+  "Read a session/prompt request, stream agent message chunks, then respond with the
+  given `stop-reason`, echoing the request id verbatim."
+  [chunks stop-reason]
+  (let [line (read-line)]
+    (debug! (str "request:" line))
+    (when (some? line)
+      (doseq [t chunks]
+        (notify (agent-chunk-notification t)))
+      (let [id (request-id line)
+            response (str "{\"jsonrpc\":\"2.0\",\"id\":" id
+                          ",\"result\":{\"stopReason\":\"" stop-reason "\"}}")]
         (print response)
         (print "\n")
         (flush)
@@ -106,11 +143,22 @@
     "hang" (do (respond 1 "{}")
                (Thread/sleep Long/MAX_VALUE))
     "session-ok" (do (respond 1 ok-capabilities)
-                     (reply-result "{\"sessionId\":\"sess-abc-123\"}")
+                     (reply-session)
                      ;; Stay alive until the client closes stdin so close is graceful.
                      (read-line))
     "session-error" (do (respond 1 ok-capabilities)
                         (reply-error -32000 "cwd does not exist"))
+    "prompt-ok" (do (respond 1 ok-capabilities)
+                    (reply-session)
+                    (reply-prompt ["Hello, " "world!"] "end_turn")
+                    (read-line))
+    "prompt-stop" (do (respond 1 ok-capabilities)
+                      (reply-session)
+                      (reply-prompt ["partial"] "max_tokens")
+                      (read-line))
+    "prompt-error" (do (respond 1 ok-capabilities)
+                       (reply-session)
+                       (reply-error -32000 "prompt failed"))
     (do (binding [*out* *err*]
           (println "unknown behavior:" behavior))
         (System/exit 2))))

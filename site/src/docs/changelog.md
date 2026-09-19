@@ -10,6 +10,12 @@ duplicate of git history.
 
 ## Unreleased
 
+- Implement Stage 1c ACP prompt turn (#41).
+  - Add `oml.acp/prompt`, sending `session/prompt` and returning `{:stop-reason ... :updates [...]}` with the turn's ordered `session/update` events.
+  - Capture streamed `session/update` events per connection via a registered SDK consumer.
+  - Extend the fake ACP subprocess and behavior tests to cover a streamed turn, a non-`end_turn` stop reason, and an agent-reported failure.
+  - Document `prompt` on the [ACP connection](/docs/acp-connection/) page and update this changelog.
+
 - Implement Stage 1b ACP session creation (#39).
   - Add `oml.acp/new-session`, sending `session/new` through the SDK and returning `{:session-id "..."}`.
   - Extend the fake ACP subprocess and behavior tests to cover session-creation success and agent-reported failure.

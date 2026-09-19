@@ -13,11 +13,12 @@ capabilities, and close the connection safely.
 ## Public interface
 
 The `oml.acp` namespace is a thin wrapper over the official ACP Java SDK
-(`com.agentclientprotocol:acp-core:0.16.0`). It exposes four functions:
+(`com.agentclientprotocol:acp-core:0.16.0`). It exposes five functions:
 
 - `(connect command args)` — launch a local agent and negotiate ACP v1.
 - `(capabilities conn)` — return the negotiated capabilities, including `:protocol-version`.
 - `(new-session conn cwd)` — create a session and return `{:session-id "..."}`.
+- `(prompt conn session-id text)` — send a prompt and return `{:stop-reason ... :updates [...]}`.
 - `(close conn)` — close the connection idempotently with a bounded wait.
 
 `connect` accepts an executable `command`, a sequence of string `args`, and an optional
@@ -33,6 +34,15 @@ tagged with `:oml/error`:
 
 `(new-session conn cwd)` creates an ACP session on an initialized connection and returns an immutable map `{:session-id "<id>"}`. `cwd` is an absolute-path string naming the agent's working directory. Failures raise `ex-info` tagged with `:oml/error` using the same categories above, with the original SDK `Throwable` attached as the exception cause.
 
+## Prompts
+
+`(prompt conn session-id text)` sends a text prompt on an existing session and completes the turn. It returns an immutable map `{:stop-reason <keyword> :updates [<update-map> ...]}`:
+
+- `:stop-reason` is the agent's final stop reason as a keyword, for example `:end-turn`, `:max-tokens`, or `:refusal`.
+- `:updates` is the ordered vector of `session/update` events received during the turn. Each is a map with `:type` (for example `:agent-message-chunk`) and, for text-bearing chunks, a `:text` string.
+
+Failures raise `ex-info` tagged with `:oml/error` using the categories above, with the original SDK `Throwable` attached as the exception cause.
+
 ## What the SDK owns
 
 The wrapper intentionally does not re-implement ACP mechanics. The official SDK is
@@ -46,9 +56,9 @@ responsible for:
 
 ## What this stage excludes
 
-The connection lifecycle currently implements connection, initialization, and session creation. It does not yet implement:
+The connection lifecycle currently implements connection, initialization, session creation, and single-turn prompting. It does not yet implement:
 
-- `session/prompt`, `session/update`, or the turn lifecycle.
+- Rich modeling of non-text `session/update` kinds (tool calls, plans) and non-text prompt content.
 - Permissions (`session/request_permission`), callbacks, or grants.
 - Turn cancellation (`session/cancel`).
 - Capability-gated `session/close`.
