@@ -2,7 +2,8 @@
 ;;
 ;; The owner kernel stays on Clojure eval; SCI confines grant-scoped eval.
 {:deps {org.babashka/sci {:mvn/version "0.15.58"}
-        org.clojure/clojure {:mvn/version "1.12.0"}}
+        org.clojure/clojure {:mvn/version "1.12.0"}
+        org.clojure/data.json {:mvn/version "2.5.1"}}
  :aliases {:oml {:main-opts ["-m" "oml.core"]}
            ;; Focused tests:   clojure -M:test -n oml.kernel-test
            ;; All tests:       clojure -M:test

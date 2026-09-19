@@ -31,10 +31,40 @@
             url = "https://repo.maven.apache.org/maven2/org/clojure/core.specs.alpha/0.4.74/core.specs.alpha-0.4.74.jar";
             hash = "sha256-63OsCM9JuoQMiLpnvu8RM2ylVDM9lAiAjXiUbg/rnds=";
           };
+          dataJsonJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/org/clojure/data.json/2.5.1/data.json-2.5.1.jar";
+            hash = "sha256-baVzUeM0FzyF3qFpbH1IR6Tz4R266zl9pl56JoSelLM=";
+          };
+          sciJar = pkgs.fetchurl {
+            url = "https://repo.clojars.org/org/babashka/sci/0.15.58/sci-0.15.58.jar";
+            hash = "sha256-rqDhY9lxFzPhrZSB3Kd+ThYYaCASMWrFgW1IBYbdGMo=";
+          };
+          edamameJar = pkgs.fetchurl {
+            url = "https://repo.clojars.org/borkdude/edamame/1.6.42/edamame-1.6.42.jar";
+            hash = "sha256-OrL72ww2BrDcSnDItafjxXkPqukvCYTxowO9myMp9t0=";
+          };
+          sciTypesJar = pkgs.fetchurl {
+            url = "https://repo.clojars.org/org/babashka/sci.impl.types/0.0.3/sci.impl.types-0.0.3.jar";
+            hash = "sha256-0zHboOBzjDgdc38YUlBw51tj8/Z+/IjTRQ2wDHVf5t4=";
+          };
+          graalLockingJar = pkgs.fetchurl {
+            url = "https://repo.clojars.org/borkdude/graal.locking/0.0.2/graal.locking-0.0.2.jar";
+            hash = "sha256-eFlpdVXBVNcgMM6zRTTPuqcKxLWJhAQdN4ULU733FF4=";
+          };
+          toolsReaderJar = pkgs.fetchurl {
+            url = "https://repo.maven.apache.org/maven2/org/clojure/tools.reader/1.5.2/tools.reader-1.5.2.jar";
+            hash = "sha256-y5btDv3wuLw2JjLLdAZ+8iX2sD8/R4yLpEGC9qF6N7Y=";
+          };
           runtimeClasspath = pkgs.lib.concatStringsSep ":" [
             clojureJar
             specAlphaJar
             coreSpecsAlphaJar
+            dataJsonJar
+            sciJar
+            edamameJar
+            sciTypesJar
+            graalLockingJar
+            toolsReaderJar
           ];
           oml = pkgs.stdenvNoCC.mkDerivation {
             pname = "oml";
@@ -62,10 +92,17 @@
           };
           testRunner = pkgs.writeText "oml-test-runner.clj" ''
             (require 'clojure.test)
-            (require 'oml.core-test 'oml.kernel-test 'oml.repl-test)
+            (require
+              'oml.agent-test
+              'oml.core-test
+              'oml.grant-test
+              'oml.kernel-test
+              'oml.repl-test)
             (let [{:keys [fail error]}
                   (clojure.test/run-tests
+                    'oml.agent-test
                     'oml.core-test
+                    'oml.grant-test
                     'oml.kernel-test
                     'oml.repl-test)]
               (System/exit (if (zero? (+ fail error)) 0 1)))
