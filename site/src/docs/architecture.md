@@ -7,7 +7,7 @@ description: "The accepted architecture of oml: a programmable Lisp image and AC
 
 This document records oml's **accepted** architecture — the design the project is
 building to, including decisions already shipped and decisions accepted but not yet
-implemented. The long-term aspiration is in the [Vision](/docs/vision/); the record of
+implemented. The long-term aspiration is on the [home page](/); the record of
 what has actually shipped is in the [Changelog](/docs/changelog/). The authoritative
 design record is issue [#30](https://github.com/sm-th/oh-my-lisp/issues/30).
 

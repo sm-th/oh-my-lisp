@@ -113,7 +113,7 @@ a, button, input, textarea, select, [tabindex]:not([tabindex="-1"]) {
   margin: 0 auto;
   padding: var(--space-4) 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-3) var(--space-6);
   align-items: center;
   border-bottom: 1px solid var(--color-border-subtle);
@@ -145,11 +145,12 @@ a, button, input, textarea, select, [tabindex]:not([tabindex="-1"]) {
 .nav-brand {
   color: var(--color-text) !important;
   font-weight: 700;
+  margin-right: auto;
 }
 
 .nav-links {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--space-2) var(--space-5);
   align-items: center;
 }
@@ -173,10 +174,12 @@ a, button, input, textarea, select, [tabindex]:not([tabindex="-1"]) {
 @media (max-width: 640px) {
   .site-nav {
     gap: var(--space-3) var(--space-4);
+    flex-wrap: wrap;
   }
 
   .nav-links {
     column-gap: var(--space-4);
+    flex-wrap: wrap;
   }
 
   .nav-links a:last-child {
@@ -510,26 +513,6 @@ article .status {
 article .note {
   background: var(--color-note-bg);
   border-left: 3px solid var(--color-note);
-}
-
-.docs-index ul {
-  list-style: none;
-  padding-left: 0;
-}
-
-.docs-index li {
-  margin: var(--space-3) 0;
-  color: var(--color-text-secondary);
-}
-
-.docs-index a {
-  color: var(--color-link);
-  text-decoration: none;
-}
-
-.docs-index a:hover {
-  color: var(--color-link-hover);
-  text-decoration: underline;
 }
 
 /* --------------------------------------------------------------------------
