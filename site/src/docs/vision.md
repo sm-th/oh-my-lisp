@@ -1,6 +1,9 @@
+---
+layout: docs.njk
+title: "Vision — oh-my-lisp"
+description: "What oml is and why it matters."
+---
 # Vision
-
-## What oml is
 
 > **oml** (*oh my lisp*) — a personal, persistent, self-evolving Lisp you drive
 > in natural language, and, when you want precision, in Lisp directly. An agent lives

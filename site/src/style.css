@@ -18,6 +18,22 @@ body {
 }
 main { max-width: 720px; margin: 0 auto; padding: 4rem 0 6rem; }
 
+.site-nav {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.site-nav a { color: var(--dim); text-decoration: none; }
+.site-nav a:hover { color: var(--accent); text-decoration: underline; }
+.nav-brand { color: var(--fg) !important; font-weight: 700; }
+.nav-links { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+
 .hero { text-align: left; }
 .brand {
   display: flex;
@@ -87,6 +103,47 @@ main { max-width: 720px; margin: 0 auto; padding: 4rem 0 6rem; }
 
 footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--line); color: var(--dim); }
 footer .links { font-size: 0.9rem; }
+
+.docs-cta { margin-top: 4rem; }
+.docs-cta h2 { font-size: 1rem; color: var(--accent); }
+.docs-cta p { max-width: 60ch; color: var(--dim); }
+.docs-cta a { color: var(--accent); text-decoration: none; }
+.docs-cta a:hover { text-decoration: underline; }
+
+article, .docs-index { max-width: 720px; margin: 0 auto; padding: 3rem 0 6rem; }
+article h1, .docs-index h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+article h2, .docs-index h2 { font-size: 1.15rem; color: var(--accent); margin: 2rem 0 0.6rem; }
+article h3 { font-size: 1rem; color: var(--fg); margin: 1.5rem 0 0.4rem; }
+article p, article li { color: var(--dim); }
+article a { color: var(--accent); text-decoration: none; }
+article a:hover { text-decoration: underline; }
+article code {
+  background: var(--card);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+article pre {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+article pre code { background: transparent; padding: 0; }
+article ul, article ol { padding-left: 1.4rem; }
+article .status, article .note {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+  margin: 1.5rem 0;
+  color: var(--dim);
+}
+.docs-index ul { list-style: none; padding-left: 0; }
+.docs-index li { margin: 0.4rem 0; }
+.docs-index a { color: var(--accent); text-decoration: none; }
+.docs-index a:hover { text-decoration: underline; }
 
 @media (max-width: 560px) {
   .why { grid-template-columns: 1fr; }

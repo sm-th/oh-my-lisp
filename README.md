@@ -23,9 +23,13 @@ you> (skills)
 
 ## Documents
 
-- [Vision](docs/vision.md) — what oml is and why it matters.
-- [Architecture](docs/architecture.md) — the core: interpreter, image, grant,
-  natural-language front, skills, extension seam.
+- [Vision](https://oml.sh/docs/vision/) — what oml is and why it matters.
+- [Architecture](https://oml.sh/docs/architecture/) — the current JVM foundation and
+  intended core shape.
+- [ACP client architecture](https://oml.sh/docs/acp-architecture/) — accepted design
+  for the local ACP v1 client.
+- [Changelog](https://oml.sh/docs/changelog/) — a lightweight record of notable
+  changes.
 
 ## Status
 

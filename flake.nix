@@ -92,6 +92,20 @@
             fi
             touch "$out"
           '';
+          site = pkgs.buildNpmPackage {
+            pname = "oml-site";
+            version = "0.1.0";
+            src = ./site;
+            npmDepsHash = "sha256-w5lFWRkLz/Sk/e4Jm4t4I+oq6wKQpBYWe8jxOb0apTw=";
+            buildPhase = ''
+              npm run build
+            '';
+            installPhase = ''
+              mkdir -p $out
+              cp -R _site $out/
+            '';
+            meta.description = "Generated oml documentation site";
+          };
         in
         {
           inherit
@@ -101,6 +115,7 @@
             jvmTests
             oml
             productionCheck
+            site
             ;
         };
     in
@@ -125,6 +140,7 @@
         default = (perSystem system).productionCheck;
         jvm-tests = (perSystem system).jvmTests;
         package = (perSystem system).oml;
+        site = (perSystem system).site;
       });
     };
 }

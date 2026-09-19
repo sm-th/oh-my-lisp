@@ -1,7 +1,18 @@
+---
+layout: docs.njk
+title: "Architecture — oh-my-lisp"
+description: "The current JVM foundation and intended core shape of oml."
+---
 # Architecture
 
-oml is a Lisp image you run and inhabit. This document describes what the core
-**includes**.
+oml is a programmable Lisp runtime. This document describes the current foundation
+and the intended core shape of the project.
+
+<p class="status">
+<strong>Status:</strong> The first implementation stage uses JVM Clojure and a
+Nix-based build. Babashka/SCI support and ACP agent integration are accepted future
+directions, not shipped behavior.
+</p>
 
 ## Shape: body and mind
 
@@ -19,9 +30,9 @@ by the grant.
 
 ### 1. Interpreter
 
-A Lisp of the Clojure family, built to run from one codebase on both a full JVM and a
-lightweight [babashka](https://babashka.org)/SCI runtime. It works interactively (a
-REPL) and headless (evaluating a program or a single expression).
+A Lisp of the Clojure family. The first version runs on a full JVM via Clojure.
+A lightweight babashka/SCI runtime is an accepted future possibility, not a current
+delivery commitment.
 
 ### 2. Persistent image
 
@@ -54,8 +65,8 @@ use. Skills are how the image gets better at understanding and serving its owner
 
 Capabilities are added to an image by import, declared in the image's configuration. The
 core provides the seam; what is imported — tools, verbs, integrations — is the owner's
-choice. (Connectivity to other images is one such importable capability; it is not part
-of the core.)
+choice. Connectivity to other images is one such importable capability; it is not part of
+the core.
 
 ## Configuration
 
@@ -65,12 +76,11 @@ configuration is how an image is specialized for a purpose.
 
 ## Runtime notes
 
-- One codebase, two runtimes: a full JVM for a heavyweight image, babashka/SCI for a
-  light, fast-starting one.
-- The object model is plain Clojure — functions and maps — so it behaves identically
-  under both runtimes.
+- The current build is JVM Clojure on a Nix foundation.
+- The object model is plain Clojure — functions and maps — so behavior can remain
+  portable if a second runtime is added later.
 
-## Status
+## Future direction
 
-Design stage. This document records the intended core; the surface syntax in examples is
-illustrative.
+The accepted ACP client design describes how an external coding agent can be connected
+through the Agent Client Protocol. See [ACP client architecture](/docs/acp-architecture/).

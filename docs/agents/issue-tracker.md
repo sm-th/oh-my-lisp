@@ -9,7 +9,7 @@ Read sources in this order:
 1. The current issue body, comments that record owner decisions, and acceptance criteria define the requested change.
 2. Current code, tests, and executable configuration define behavior and commands that already exist.
 3. `CONTEXT.md` defines canonical vocabulary and responsibility boundaries.
-4. `README.md`, `docs/vision.md`, and `docs/architecture.md` describe product direction; they do not override the sources above.
+4. `README.md`, `site/src/docs/vision.md`, and `site/src/docs/architecture.md` describe product direction; they do not override the sources above.
 
 When those sources disagree, follow the higher source and keep the pull request limited to its approved scope. Record a material scope decision on every affected issue or the pull request so reviewers can evaluate the same specification.
 
