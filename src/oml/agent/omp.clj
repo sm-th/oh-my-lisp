@@ -364,8 +364,11 @@
   (validate-open-options! options)
   (let [cwd (str (:cwd options))
         session-dir (str (:session-dir options))
-        _ (Files/createDirectories (Paths/get cwd (make-array String 0)))
-        _ (Files/createDirectories (Paths/get session-dir (make-array String 0)))
+        no-attributes (make-array java.nio.file.attribute.FileAttribute 0)
+        _ (Files/createDirectories (Paths/get cwd (make-array String 0))
+                                   no-attributes)
+        _ (Files/createDirectories (Paths/get session-dir (make-array String 0))
+                                   no-attributes)
         command (launch-command options)
         process (try
                   (.start (doto (ProcessBuilder. ^java.util.List command)
