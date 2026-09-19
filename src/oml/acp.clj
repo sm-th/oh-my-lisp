@@ -113,23 +113,29 @@
   ([command args]
    (connect command args nil))
   ([command args env]
-   (try
-     (let [params (build-parameters command args env)
-           transport (StdioAcpClientTransport. params)
-           client (-> (AcpClient/sync transport)
-                      (.requestTimeout default-request-timeout)
-                      .build)
-           response (.initialize client)]
-       (when (not= 1 (.protocolVersion response))
-         (throw (ex-info (str "ACP protocol version mismatch: expected 1, got "
-                              (.protocolVersion response))
-                         {:oml/error :acp/protocol
-                          :acp/protocol-version (.protocolVersion response)})))
-       (->Connection client transport (atom false) 1))
-     (catch clojure.lang.ExceptionInfo e
-       (throw e))
-     (catch Throwable t
-       (wrap-error t)))))
+   (let [client (atom nil)]
+     (try
+       (let [params (build-parameters command args env)
+             transport (StdioAcpClientTransport. params)
+             c (-> (AcpClient/sync transport)
+                   (.requestTimeout default-request-timeout)
+                   .build)]
+         (reset! client c)
+         (let [response (.initialize c)]
+           (when (not= 1 (.protocolVersion response))
+             (throw (ex-info (str "ACP protocol version mismatch: expected 1, got "
+                                  (.protocolVersion response))
+                             {:oml/error :acp/protocol
+                              :acp/protocol-version (.protocolVersion response)})))
+           (->Connection c transport (atom false) 1)))
+       (catch clojure.lang.ExceptionInfo e
+         (when-let [c @client]
+           (try (.closeGracefully ^AcpSyncClient c) (catch Throwable _)))
+         (throw e))
+       (catch Throwable t
+         (when-let [c @client]
+           (try (.closeGracefully ^AcpSyncClient c) (catch Throwable _)))
+         (wrap-error t))))))
 
 (defn capabilities
   "Return the negotiated agent capabilities for `conn` as a Clojure map.

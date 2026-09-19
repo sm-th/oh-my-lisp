@@ -5,8 +5,10 @@
   through its public interface: connect, capabilities, close. The tests do not
   assert against SDK internals; they verify the outcomes and error categories
   the wrapper owns."
-  (:require [clojure.test :refer [deftest is testing]]
-            [oml.acp :as acp]))
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is testing]]
+            [oml.acp :as acp])
+  (:import [java.io File]))
 
 (defn- java-binary
   "Return the path to the current JVM executable."
@@ -28,8 +30,29 @@
 
 (defn- connect-fake
   "Connect to the fake agent with the given behavior."
-  [behavior]
-  (acp/connect (java-binary) (fake-agent-args behavior)))
+  ([behavior]
+   (connect-fake behavior nil))
+  ([behavior env]
+   (acp/connect (java-binary) (fake-agent-args behavior) env)))
+
+(defn- process-alive? [pid-str]
+  (boolean
+   (when-let [pid (try (Long/parseLong (str/trim pid-str)) (catch Throwable _))]
+     (when-let [handle (ProcessHandle/of pid)]
+       (.isPresent handle)))))
+
+(defn- wait-for-process-death
+  "Return true if the process whose PID is in `pid-file` is still alive after
+  waiting up to `timeout-ms` milliseconds."
+  [^File pid-file timeout-ms]
+  (let [deadline (+ (System/currentTimeMillis) timeout-ms)]
+    (loop []
+      (let [pid (when (.isFile pid-file) (slurp pid-file))
+            alive? (process-alive? pid)]
+        (if (and alive? (< (System/currentTimeMillis) deadline))
+          (do (Thread/sleep 200)
+              (recur))
+          alive?)))))
 
 (deftest connect-negotiates-v1-and-exposes-capabilities
   (let [conn (connect-fake "ok")
@@ -57,6 +80,16 @@
                (catch Throwable t
                  (ex-data t)))]
     (is (= :acp/protocol (:oml/error data)))))
+
+(deftest connect-reaps-process-on-protocol-version-mismatch
+  (let [pid-file (File/createTempFile "acp-fake" ".pid")]
+    (.deleteOnExit pid-file)
+    (try
+      (connect-fake "bad-version" {"ACP_FAKE_PID_FILE" (.getPath pid-file)})
+      (is false "expected connect to throw")
+      (catch Throwable _))
+    (is (false? (wait-for-process-death pid-file 6000))
+        "subprocess should be reaped after connect fails")))
 
 (deftest malformed-frame-yields-stable-error
   (let [data (try
