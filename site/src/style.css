@@ -19,6 +19,16 @@ body {
 main { max-width: 720px; margin: 0 auto; padding: 4rem 0 6rem; }
 
 .hero { text-align: left; }
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+.logo {
+  width: 5.25rem;
+  height: 5.25rem;
+  flex: none;
+}
 .wordmark {
   font-size: 3.5rem;
   font-weight: 700;
@@ -81,4 +91,6 @@ footer .links { font-size: 0.9rem; }
 @media (max-width: 560px) {
   .why { grid-template-columns: 1fr; }
   .wordmark { font-size: 2.75rem; }
+  .logo { width: 4rem; height: 4rem; }
+  .brand { gap: 0.9rem; }
 }
