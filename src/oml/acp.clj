@@ -6,6 +6,7 @@
   initialize handshake, exposes negotiated capabilities, and closes the connection
   idempotently. All failures are translated into ex-info values tagged with
   :oml/error."
+  (:require [clojure.string :as str])
   (:import
    [com.agentclientprotocol.sdk.capabilities NegotiatedCapabilities]
    [com.agentclientprotocol.sdk.client AcpClient AcpSyncClient]
@@ -13,8 +14,12 @@
    [com.agentclientprotocol.sdk.error AcpCapabilityException AcpConnectionException
     AcpException AcpProtocolException]
    [com.agentclientprotocol.sdk.spec AcpSchema$NewSessionRequest AcpSchema$NewSessionResponse
-    AcpClientSession$AcpError]
-   [java.time Duration]))
+    AcpSchema$PromptRequest AcpSchema$PromptResponse AcpSchema$TextContent AcpSchema$StopReason
+    AcpSchema$SessionNotification AcpSchema$AgentMessageChunk AcpSchema$AgentThoughtChunk
+    AcpSchema$UserMessageChunk AcpClientSession$AcpError]
+   [java.time Duration]
+   [java.util.concurrent ConcurrentLinkedQueue]
+   [java.util.function Consumer]))
 
 (def ^:private default-request-timeout
   "Bounded request timeout applied to every SDK operation initiated by this wrapper."
@@ -117,8 +122,53 @@
      :mcp-http (.supportsMcpHttp caps)
      :mcp-sse (.supportsMcpSse caps)}))
 
+(defn- content-text
+  "Return the text of a ContentBlock when it is a text block, else nil."
+  [content]
+  (when (instance? AcpSchema$TextContent content)
+    (.text ^AcpSchema$TextContent content)))
+
+(defn- camel->kebab-kw
+  "Convert a CamelCase class name into a kebab-case keyword."
+  [^String s]
+  (-> s
+      (str/replace #"([a-z])([A-Z])" "$1-$2")
+      str/lower-case
+      keyword))
+
+(defn- update->map
+  "Convert an SDK SessionUpdate into a Clojure map with :type and, for text-bearing
+  chunks, :text."
+  [update]
+  (cond
+    (instance? AcpSchema$AgentMessageChunk update)
+    {:type :agent-message-chunk :text (content-text (.content ^AcpSchema$AgentMessageChunk update))}
+    (instance? AcpSchema$AgentThoughtChunk update)
+    {:type :agent-thought-chunk :text (content-text (.content ^AcpSchema$AgentThoughtChunk update))}
+    (instance? AcpSchema$UserMessageChunk update)
+    {:type :user-message-chunk :text (content-text (.content ^AcpSchema$UserMessageChunk update))}
+    :else
+    {:type (camel->kebab-kw (.getSimpleName (class update)))}))
+
+(defn- stop-reason->kw
+  "Convert an SDK StopReason enum to a Clojure keyword (e.g. :end-turn)."
+  [^AcpSchema$StopReason sr]
+  (when sr
+    (-> (.name sr) str/lower-case (str/replace "_" "-") keyword)))
+
+(defn- drain-settle
+  "Wait until the update queue stops growing, bounded to two seconds, so late-arriving
+  session/update consumers are captured without an unbounded wait."
+  [^ConcurrentLinkedQueue q]
+  (let [deadline (+ (System/currentTimeMillis) 2000)]
+    (loop [prev -1]
+      (let [now (.size q)]
+        (when (and (not= now prev) (< (System/currentTimeMillis) deadline))
+          (Thread/sleep 40)
+          (recur now))))))
+
 (defrecord Connection
-  [^AcpSyncClient client ^StdioAcpClientTransport transport closed? protocol-version])
+  [^AcpSyncClient client ^StdioAcpClientTransport transport closed? protocol-version updates])
 
 (defn connect
   "Launch the configured local agent command and complete the ACP v1 initialize
@@ -132,12 +182,18 @@
   ([command args]
    (connect command args nil))
   ([command args env]
-   (let [client (atom nil)]
+   (let [client (atom nil)
+         updates (ConcurrentLinkedQueue.)]
      (try
        (let [params (build-parameters command args env)
              transport (StdioAcpClientTransport. params)
+             consumer (reify Consumer
+                        (accept [_ notification]
+                          (.add updates
+                                (update->map (.update ^AcpSchema$SessionNotification notification)))))
              c (-> (AcpClient/sync transport)
                    (.requestTimeout default-request-timeout)
+                   (.sessionUpdateConsumer consumer)
                    .build)]
          (reset! client c)
          (let [response (.initialize c)]
@@ -146,7 +202,7 @@
                                   (.protocolVersion response))
                              {:oml/error :acp/protocol
                               :acp/protocol-version (.protocolVersion response)})))
-           (->Connection c transport (atom false) 1)))
+           (->Connection c transport (atom false) 1 updates)))
        (catch clojure.lang.ExceptionInfo e
          (when-let [c @client]
            (try (.closeGracefully ^AcpSyncClient c) (catch Throwable _)))
@@ -180,6 +236,28 @@
     (let [req (AcpSchema$NewSessionRequest. cwd nil nil nil)
           ^AcpSchema$NewSessionResponse resp (.newSession ^AcpSyncClient (:client conn) req)]
       {:session-id (.sessionId resp)})
+    (catch clojure.lang.ExceptionInfo e
+      (throw e))
+    (catch Throwable t
+      (wrap-error t))))
+
+(defn prompt
+  "Send `text` as a prompt on `session-id` over `conn` and complete the turn.
+
+  Sends `session/prompt` with a single text content block through the SDK's
+  synchronous client and returns an immutable map
+  {:stop-reason <keyword> :updates [<update-map> ...]}, where :updates are the
+  ordered session/update events received during the turn. Throws ex-info tagged
+  with :oml/error on failure."
+  [^Connection conn ^String session-id ^String text]
+  (try
+    (let [^ConcurrentLinkedQueue q (:updates conn)]
+      (.clear q)
+      (let [req (AcpSchema$PromptRequest. session-id [(AcpSchema$TextContent. text)])
+            ^AcpSchema$PromptResponse resp (.prompt ^AcpSyncClient (:client conn) req)]
+        (drain-settle q)
+        {:stop-reason (stop-reason->kw (.stopReason resp))
+         :updates (vec (.toArray q))}))
     (catch clojure.lang.ExceptionInfo e
       (throw e))
     (catch Throwable t

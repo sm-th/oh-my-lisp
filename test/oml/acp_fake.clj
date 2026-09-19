@@ -91,6 +91,39 @@
         (flush)
         (debug! (str "response:" response))))))
 
+(defn- agent-chunk-notification
+  "A session/update notification carrying an agent_message_chunk with `text`."
+  [text]
+  (str "{\"jsonrpc\":\"2.0\",\"method\":\"session/update\","
+       "\"params\":{\"sessionId\":\"sess-abc-123\","
+       "\"update\":{\"sessionUpdate\":\"agent_message_chunk\","
+       "\"content\":{\"type\":\"text\",\"text\":\"" text "\"}}}}"))
+
+(defn- notify
+  "Write a JSON-RPC notification line (no id)."
+  [json]
+  (print json)
+  (print "\n")
+  (flush)
+  (debug! (str "notify:" json)))
+
+(defn- reply-prompt
+  "Read a session/prompt request, stream agent message chunks, then respond with the
+  given `stop-reason`, echoing the request id verbatim."
+  [chunks stop-reason]
+  (let [line (read-line)]
+    (debug! (str "request:" line))
+    (when (some? line)
+      (doseq [t chunks]
+        (notify (agent-chunk-notification t)))
+      (let [id (request-id line)
+            response (str "{\"jsonrpc\":\"2.0\",\"id\":" id
+                          ",\"result\":{\"stopReason\":\"" stop-reason "\"}}")]
+        (print response)
+        (print "\n")
+        (flush)
+        (debug! (str "response:" response))))))
+
 (defn- run-behavior
   [behavior]
   (write-pid)
@@ -111,6 +144,17 @@
                      (read-line))
     "session-error" (do (respond 1 ok-capabilities)
                         (reply-error -32000 "cwd does not exist"))
+    "prompt-ok" (do (respond 1 ok-capabilities)
+                    (reply-result "{\"sessionId\":\"sess-abc-123\"}")
+                    (reply-prompt ["Hello, " "world!"] "end_turn")
+                    (read-line))
+    "prompt-stop" (do (respond 1 ok-capabilities)
+                      (reply-result "{\"sessionId\":\"sess-abc-123\"}")
+                      (reply-prompt ["partial"] "max_tokens")
+                      (read-line))
+    "prompt-error" (do (respond 1 ok-capabilities)
+                       (reply-result "{\"sessionId\":\"sess-abc-123\"}")
+                       (reply-error -32000 "prompt failed"))
     (do (binding [*out* *err*]
           (println "unknown behavior:" behavior))
         (System/exit 2))))

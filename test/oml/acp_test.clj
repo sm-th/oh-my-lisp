@@ -143,6 +143,37 @@
     (is (instance? Throwable (.getCause ^Throwable ex)))
     (acp/close conn)))
 
+(deftest prompt-completes-turn-with-ordered-updates
+  (let [conn (connect-fake "prompt-ok")
+        sid (:session-id (acp/new-session conn "/tmp"))
+        result (acp/prompt conn sid "hi")
+        texts (->> (:updates result)
+                   (filter #(= :agent-message-chunk (:type %)))
+                   (map :text)
+                   vec)]
+    (is (= :end-turn (:stop-reason result)))
+    (is (= ["Hello, " "world!"] texts))
+    (acp/close conn)))
+
+(deftest prompt-reports-non-end-turn-stop-reason
+  (let [conn (connect-fake "prompt-stop")
+        sid (:session-id (acp/new-session conn "/tmp"))
+        result (acp/prompt conn sid "hi")]
+    (is (= :max-tokens (:stop-reason result)))
+    (acp/close conn)))
+
+(deftest prompt-failure-yields-stable-error
+  (let [conn (connect-fake "prompt-error")
+        sid (:session-id (acp/new-session conn "/tmp"))
+        ex (try
+             (acp/prompt conn sid "hi")
+             nil
+             (catch clojure.lang.ExceptionInfo e e))]
+    (is (some? ex) "expected prompt to throw on an agent-reported failure")
+    (is (contains? #{:acp/protocol :acp/agent :acp/connection} (:oml/error (ex-data ex))))
+    (is (not= :acp/unknown (:oml/error (ex-data ex))))
+    (acp/close conn)))
+
 (defn -main
   "Entry point for running this namespace standalone."
   [& _]
