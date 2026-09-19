@@ -47,6 +47,13 @@
        "\"promptCapabilities\":{\"audio\":true},"
        "\"mcpCapabilities\":{\"http\":true,\"sse\":true}}"))
 
+(def ^:private no-close-capabilities
+  "Capabilities without session close, for the unsupported close-session path."
+  (str "{\"loadSession\":true,"
+       "\"sessionCapabilities\":{\"list\":{},\"resume\":{}},"
+       "\"promptCapabilities\":{\"audio\":true},"
+       "\"mcpCapabilities\":{\"http\":true,\"sse\":true}}"))
+
 (defn- respond
   "Read one initialize request and write a JSON-RPC result with the given
   `protocol-version` and `capabilities` JSON, echoing the request id verbatim."
@@ -76,6 +83,19 @@
                        (str "{\"jsonrpc\":\"2.0\",\"id\":" id ",\"result\":{\"sessionId\":\"sess-abc-123\"}}")
                        (str "{\"jsonrpc\":\"2.0\",\"id\":" id
                             ",\"error\":{\"code\":-32602,\"message\":\"missing mcpServers array\"}}"))]
+        (print response)
+        (print "\n")
+        (flush)
+        (debug! (str "response:" response))))))
+
+(defn- reply-empty-result
+  "Read one request and reply with an empty JSON-RPC result, echoing the id verbatim."
+  []
+  (let [line (read-line)]
+    (debug! (str "request:" line))
+    (when (some? line)
+      (let [id (request-id line)
+            response (str "{\"jsonrpc\":\"2.0\",\"id\":" id ",\"result\":{}}")]
         (print response)
         (print "\n")
         (flush)
@@ -220,6 +240,13 @@
                         (reply-session)
                         (reply-prompt-await-cancel)
                         (read-line))
+    "session-close-ok" (do (respond 1 ok-capabilities)
+                           (reply-session)
+                           (reply-empty-result)
+                           (read-line))
+    "session-close-unsupported" (do (respond 1 no-close-capabilities)
+                                    (reply-session)
+                                    (read-line))
     (do (binding [*out* *err*]
           (println "unknown behavior:" behavior))
         (System/exit 2))))

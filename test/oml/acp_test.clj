@@ -224,6 +224,22 @@
       (is (= :cancelled (:stop-reason result)))
       (acp/close conn))))
 
+(deftest close-session-when-supported
+  (let [conn (connect-fake "session-close-ok")
+        sid (:session-id (acp/new-session conn "/tmp"))]
+    (is (nil? (acp/close-session conn sid)))
+    (acp/close conn)))
+
+(deftest close-session-unsupported-yields-capability-error
+  (let [conn (connect-fake "session-close-unsupported")
+        sid (:session-id (acp/new-session conn "/tmp"))
+        data (try
+               (acp/close-session conn sid)
+               nil
+               (catch clojure.lang.ExceptionInfo e (ex-data e)))]
+    (is (= :acp/capability (:oml/error data)))
+    (acp/close conn)))
+
 (defn -main
   "Entry point for running this namespace standalone."
   [& _]

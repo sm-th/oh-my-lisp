@@ -18,7 +18,8 @@
     AcpSchema$SessionNotification AcpSchema$AgentMessageChunk AcpSchema$AgentThoughtChunk
     AcpSchema$UserMessageChunk AcpSchema$RequestPermissionRequest AcpSchema$RequestPermissionResponse
     AcpSchema$PermissionOption AcpSchema$PermissionOptionKind AcpSchema$PermissionSelected
-    AcpSchema$PermissionCancelled AcpSchema$CancelNotification AcpClientSession$AcpError]
+    AcpSchema$PermissionCancelled AcpSchema$CancelNotification AcpSchema$CloseSessionRequest
+    AcpClientSession$AcpError]
    [java.time Duration]
    [java.util.concurrent ConcurrentLinkedQueue]
    [java.util.function Consumer Function]))
@@ -345,6 +346,25 @@
       (throw e))
     (catch Throwable t
       (wrap-error t))))
+
+(defn close-session
+  "Close the ACP session `session-id` on `conn` with `session/close`.
+
+  Gated on the negotiated :close-session capability: when the agent advertised it,
+  sends session/close and returns nil; otherwise throws ex-info tagged
+  {:oml/error :acp/capability} without sending a request. Distinct from `close`,
+  which shuts down the whole connection."
+  [^Connection conn ^String session-id]
+  (if-not (:close-session (capabilities conn))
+    (throw (ex-info "ACP agent does not support session/close"
+                    {:oml/error :acp/capability :acp/capability "session/close"}))
+    (try
+      (.closeSession ^AcpSyncClient (:client conn) (AcpSchema$CloseSessionRequest. session-id))
+      nil
+      (catch clojure.lang.ExceptionInfo e
+        (throw e))
+      (catch Throwable t
+        (wrap-error t)))))
 
 (defn close
   "Close `conn` idempotently and with a bounded wait.
