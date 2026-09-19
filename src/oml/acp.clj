@@ -12,7 +12,8 @@
    [com.agentclientprotocol.sdk.client.transport AgentParameters StdioAcpClientTransport]
    [com.agentclientprotocol.sdk.error AcpCapabilityException AcpConnectionException
     AcpException AcpProtocolException]
-   [com.agentclientprotocol.sdk.spec AcpSchema$NewSessionRequest AcpSchema$NewSessionResponse]
+   [com.agentclientprotocol.sdk.spec AcpSchema$NewSessionRequest AcpSchema$NewSessionResponse
+    AcpClientSession$AcpError]
    [java.time Duration]))
 
 (def ^:private default-request-timeout
@@ -38,6 +39,15 @@
       (nil? (.getCause e)) nil
       :else (recur (.getCause e)))))
 
+(defn- find-acp-error
+  "Return the first AcpClientSession$AcpError (a JSON-RPC error) in the cause chain, or nil."
+  [^Throwable t]
+  (loop [e t]
+    (cond
+      (instance? AcpClientSession$AcpError e) e
+      (nil? (.getCause e)) nil
+      :else (recur (.getCause e)))))
+
 (defn- timeout-cause?
   "Return true if any exception in the cause chain is a timeout."
   [^Throwable t]
@@ -51,6 +61,7 @@
   (let [cause (or (find-acp-cause t) t)]
     (cond
       (timeout-cause? t) :acp/connection
+      (find-acp-error t) :acp/agent
       (instance? AcpProtocolException cause) :acp/protocol
       (instance? AcpConnectionException cause) :acp/connection
       (instance? AcpCapabilityException cause) :acp/capability
@@ -61,9 +72,16 @@
 (defn- error-data
   "Extract stable context from an SDK failure."
   [^Throwable t]
-  (let [cause (or (find-acp-cause t) t)
+  (let [acp-error (find-acp-error t)
+        cause (or (find-acp-cause t) t)
         base {:oml/error (error-category t)}]
     (cond
+      acp-error
+      (let [je (.getError ^AcpClientSession$AcpError acp-error)]
+        (assoc base
+               :acp/error-code (.code je)
+               :acp/error-data (.data je)))
+
       (instance? AcpProtocolException cause)
       (assoc base
              :acp/error-code (.getCode ^AcpProtocolException cause)
