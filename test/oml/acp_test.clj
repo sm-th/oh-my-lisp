@@ -8,7 +8,8 @@
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [oml.acp :as acp])
-  (:import [java.io File]))
+  (:import [java.io File]
+           [java.lang ProcessHandle]))
 
 (defn- java-binary
   "Return the path to the current JVM executable."
