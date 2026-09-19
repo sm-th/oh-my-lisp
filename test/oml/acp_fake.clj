@@ -38,11 +38,13 @@
       "null"))
 
 (def ^:private ok-capabilities
-  "A small, intentional capability advertisement for the ok behavior."
+  "An intentionally mixed capability advertisement for the ok behavior: session
+  list/close/resume, audio, and MCP http/sse are supported; delete,
+  additionalDirectories, fork, providers, image, and embeddedContext are not, so the
+  wrapper's per-flag mapping is verified for both true and false."
   (str "{\"loadSession\":true,"
-       "\"sessionCapabilities\":{\"list\":{},\"close\":{},\"resume\":{},"
-       "\"delete\":{},\"additionalDirectories\":{},\"fork\":{}},"
-       "\"promptCapabilities\":{\"image\":true,\"audio\":true,\"embeddedContext\":true},"
+       "\"sessionCapabilities\":{\"list\":{},\"close\":{},\"resume\":{}},"
+       "\"promptCapabilities\":{\"audio\":true},"
        "\"mcpCapabilities\":{\"http\":true,\"sse\":true}}"))
 
 (defn- respond
