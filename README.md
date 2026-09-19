@@ -2,31 +2,70 @@
 
 **`oml`** — *oml is my lisp*.
 
-> A personal, persistent, self-evolving Lisp you drive in natural language — and,
-> when you want precision, in Lisp directly. An agent lives in the image, acts
-> through a bounded grant, and the image grows by keeping the workflows that worked.
+A Lisp image you run and inhabit. This repository currently contains the JVM
+kernel: a Clojure runtime with a built-in REPL, driven by executable init
+configuration. The [vision](docs/vision.md) and [architecture](docs/architecture.md)
+documents describe the direction — persistent image, grant, skills — that later
+issues build toward; none of that is implemented yet.
 
-oml is to Lisp agents what an agent CLI is to chat: you run it, you talk to it, and
-it becomes yours over time.
+## Run it
 
-```text
-$ oml
-oml 0.1 · image restored — 42 objects, 17 skills
-talk to me. (drop to Lisp with a leading form)
+From a repository checkout, with Clojure's CLI tools and a JVM installed:
 
-you> summarize project X and save it as a skill "weekly-x"
-oml> done — saved skill weekly-x; next time just say "weekly X".
-
-you> (skills)
-=> (:recall :note :weekly-x …)
+```console
+$ bin/oml
+oml> (+ 1 2)
+3
+oml> /eval (* 6 7)
+42
+oml> hello
+oml: unhandled natural-language input: nothing was evaluated. Lisp is evaluated when it starts with `(` or when it is marked with `/eval`
 ```
 
-## Documents
+`bin/oml` starts the built-in REPL directly; `clojure -M:oml` does the same
+from the project root.
 
-- [Vision](docs/vision.md) — what oml is and why it matters.
-- [Architecture](docs/architecture.md) — the core: interpreter, image, grant,
-  natural-language front, skills, extension seam.
+## Input rules
+
+Input is classified line by line, deterministically:
+
+- a line starting with `(` is direct Lisp — evaluated in the shared runtime
+  namespace, and the result is printed;
+- a line marked `/eval <code>` is also direct Lisp through the same eval
+  surface;
+- blank lines are no-ops;
+- anything else — ordinary text — is not evaluated. There is no
+  natural-language routing yet, so it is reported as unhandled input instead.
+
+Evaluation errors are reported with their full cause chain, and the REPL keeps
+running.
+
+## Init file
+
+The first argument, when given, is an init file — executable Clojure, not a
+declarative config:
+
+```console
+$ bin/oml ~/.oml/init.clj
+```
+
+Its forms are evaluated once, in order, before the REPL starts, into the same
+runtime namespace the REPL uses, so anything the init file defines stays
+visible to every later direct eval. Ordinary non-daemon JVM threads the init
+file starts keep the image alive after stdin reaches EOF. Omitting the init
+file is fine; a supplied file that is missing or fails to load aborts startup
+with a visible error and a non-zero exit.
+
+Init extends the running image — it never replaces the built-in REPL.
+
+## Tests
+
+```console
+$ clojure -M:test          # all tests
+$ clojure -M:test -n oml.kernel-test   # one namespace
+```
 
 ## Status
 
-Early. Design first — see the documents above. Work happens in issues and pull requests.
+Early. The JVM kernel is in; the documents above remain the direction. Work
+happens in issues and pull requests.

@@ -8,8 +8,7 @@
 (def ^:private eval-marker "/eval")
 
 (def ^:private unhandled-message
-  "unhandled natural-language input: nothing was evaluated. Lisp is
-  evaluated when it starts with `(` or when it is marked with `/eval`")
+  "unhandled natural-language input: nothing was evaluated. Lisp is evaluated when it starts with `(` or when it is marked with `/eval`")
 
 (defn- eval-marker-code
   "When `s` is explicitly marked for direct eval, return the marked
