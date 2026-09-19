@@ -128,6 +128,38 @@
         (flush)
         (debug! (str "response:" response))))))
 
+(defn- decision-from-response
+  "Extract the permission decision from the client's JSON-RPC response line: the
+  selected optionId, or \"cancelled\", or \"unknown\"."
+  [line]
+  (or (second (re-find #"\"optionId\":\"([^\"]+)\"" line))
+      (when (.contains line "cancelled") "cancelled")
+      "unknown"))
+
+(defn- reply-prompt-with-permission
+  "Read a session/prompt request, ask the client to approve a tool call, reflect the
+  client's decision back as an agent message chunk, then finish the turn."
+  [stop-reason]
+  (let [line (read-line)]
+    (debug! (str "request:" line))
+    (when (some? line)
+      (let [id (request-id line)]
+        (notify (str "{\"jsonrpc\":\"2.0\",\"id\":100,"
+                     "\"method\":\"session/request_permission\","
+                     "\"params\":{\"sessionId\":\"sess-abc-123\","
+                     "\"options\":[{\"optionId\":\"allow\",\"name\":\"Allow\",\"kind\":\"allow_once\"},"
+                     "{\"optionId\":\"reject\",\"name\":\"Reject\",\"kind\":\"reject_once\"}]}}"))
+        (let [resp (str (read-line))
+              decision (decision-from-response resp)]
+          (debug! (str "perm-response:" resp))
+          (notify (agent-chunk-notification decision))
+          (let [response (str "{\"jsonrpc\":\"2.0\",\"id\":" id
+                              ",\"result\":{\"stopReason\":\"" stop-reason "\"}}")]
+            (print response)
+            (print "\n")
+            (flush)
+            (debug! (str "response:" response))))))))
+
 (defn- run-behavior
   [behavior]
   (write-pid)
@@ -159,6 +191,10 @@
     "prompt-error" (do (respond 1 ok-capabilities)
                        (reply-session)
                        (reply-error -32000 "prompt failed"))
+    "prompt-permission" (do (respond 1 ok-capabilities)
+                            (reply-session)
+                            (reply-prompt-with-permission "end_turn")
+                            (read-line))
     (do (binding [*out* *err*]
           (println "unknown behavior:" behavior))
         (System/exit 2))))

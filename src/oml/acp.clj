@@ -16,14 +16,18 @@
    [com.agentclientprotocol.sdk.spec AcpSchema$NewSessionRequest AcpSchema$NewSessionResponse
     AcpSchema$PromptRequest AcpSchema$PromptResponse AcpSchema$TextContent AcpSchema$StopReason
     AcpSchema$SessionNotification AcpSchema$AgentMessageChunk AcpSchema$AgentThoughtChunk
-    AcpSchema$UserMessageChunk AcpClientSession$AcpError]
+    AcpSchema$UserMessageChunk AcpSchema$RequestPermissionRequest AcpSchema$RequestPermissionResponse
+    AcpSchema$PermissionOption AcpSchema$PermissionOptionKind AcpSchema$PermissionSelected
+    AcpSchema$PermissionCancelled AcpClientSession$AcpError]
    [java.time Duration]
    [java.util.concurrent ConcurrentLinkedQueue]
-   [java.util.function Consumer]))
+   [java.util.function Consumer Function]))
 
-(def ^:private default-request-timeout
-  "Bounded request timeout applied to every SDK operation initiated by this wrapper."
-  (Duration/ofSeconds 10))
+(def ^:private default-request-timeout-ms
+  "Default per-request timeout in milliseconds for SDK operations. Generous enough for
+  real prompt turns (model inference plus tool calls); override per connection with the
+  opts key :request-timeout-ms."
+  120000)
 
 (defn- ^AgentParameters build-parameters
   "Build AgentParameters from a command, a sequence of args, and an optional env map."
@@ -167,6 +171,61 @@
           (Thread/sleep 40)
           (recur now))))))
 
+(defn- kind->kw
+  "Convert a PermissionOptionKind enum to a keyword (e.g. :allow-once)."
+  [^AcpSchema$PermissionOptionKind k]
+  (when k (-> (.name k) str/lower-case (str/replace "_" "-") keyword)))
+
+(defn- option->map
+  "Convert an SDK PermissionOption to a Clojure map."
+  [^AcpSchema$PermissionOption o]
+  {:option-id (.optionId o) :name (.name o) :kind (kind->kw (.kind o))})
+
+(def ^:private reject-kinds
+  #{AcpSchema$PermissionOptionKind/REJECT_ONCE AcpSchema$PermissionOptionKind/REJECT_ALWAYS})
+
+(def ^:private allow-kinds
+  #{AcpSchema$PermissionOptionKind/ALLOW_ONCE AcpSchema$PermissionOptionKind/ALLOW_ALWAYS})
+
+(defn- first-option-id
+  "Return the optionId of the first option whose kind is in `kinds`, or nil."
+  [kinds options]
+  (some (fn [^AcpSchema$PermissionOption o] (when (contains? kinds (.kind o)) (.optionId o)))
+        options))
+
+(defn- permission-outcome
+  "Build a RequestPermissionResponse for `decision` against the offered `options`.
+
+  `decision` may be an option-id string, :allow, :reject, or :cancel. :allow and
+  :reject select the first option of that kind; anything without a selectable option
+  cancels."
+  [decision options]
+  (let [selected (cond
+                   (string? decision) decision
+                   (= :allow decision) (first-option-id allow-kinds options)
+                   (= :cancel decision) nil
+                   :else (first-option-id reject-kinds options))]
+    (AcpSchema$RequestPermissionResponse.
+     (if selected
+       (AcpSchema$PermissionSelected. selected)
+       (AcpSchema$PermissionCancelled.)))))
+
+(defn- permission-handler
+  "An SDK request-permission handler that consults `on-permission` (may be nil) and
+  falls back to a safe reject on absence or callback error."
+  [on-permission]
+  (reify Function
+    (apply [_ req]
+      (let [^AcpSchema$RequestPermissionRequest req req
+            options (.options req)
+            decision (if on-permission
+                       (try
+                         (on-permission {:session-id (.sessionId req)
+                                         :options (mapv option->map options)})
+                         (catch Throwable _ :reject))
+                       :reject)]
+        (permission-outcome decision options)))))
+
 (defrecord Connection
   [^AcpSyncClient client ^StdioAcpClientTransport transport closed? protocol-version updates])
 
@@ -175,13 +234,20 @@
   handshake.
 
   `command` is the executable name or path. `args` is a sequence of string
-  arguments. Optional `env` is a map of extra environment variables.
+  arguments. Optional `env` is a map of extra environment variables. Optional `opts`
+  is a map; `:on-permission` is a function called with a permission-request map
+  `{:session-id s :options [{:option-id ... :name ... :kind ...} ...]}` that returns
+  the decision (an option-id string, or :allow, :reject, or :cancel). Without it,
+  permission requests are rejected safely. `:request-timeout-ms` overrides the
+  per-request timeout (default 120000); raise it for long agent turns.
 
   Returns a Connection. Throws ex-info tagged with :oml/error on connection,
   protocol-version mismatch, or other protocol failure."
   ([command args]
-   (connect command args nil))
+   (connect command args nil nil))
   ([command args env]
+   (connect command args env nil))
+  ([command args env opts]
    (let [client (atom nil)
          updates (ConcurrentLinkedQueue.)]
      (try
@@ -192,8 +258,9 @@
                           (.add updates
                                 (update->map (.update ^AcpSchema$SessionNotification notification)))))
              c (-> (AcpClient/sync transport)
-                   (.requestTimeout default-request-timeout)
+                   (.requestTimeout (Duration/ofMillis (long (or (:request-timeout-ms opts) default-request-timeout-ms))))
                    (.sessionUpdateConsumer consumer)
+                   (.requestPermissionHandler (permission-handler (:on-permission opts)))
                    .build)]
          (reset! client c)
          (let [response (.initialize c)]
