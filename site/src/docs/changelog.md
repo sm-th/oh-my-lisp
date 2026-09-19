@@ -12,6 +12,7 @@ duplicate of git history.
 
 - Implement Stage 1d ACP permission handling (#43).
   - Route `session/request_permission` to an optional `:on-permission` Lisp callback passed to `connect`, defaulting to a safe reject when unconfigured or when the callback throws.
+  - Make the per-request timeout configurable via `connect` opts (`:request-timeout-ms`, default 120000) so real prompt turns are not cut off at 10 seconds.
   - Extend the fake ACP subprocess and behavior tests to exercise a client-handled permission request (allow, default reject, and callback error).
   - Document permissions on the [ACP connection](/docs/acp-connection/) page and update this changelog.
 

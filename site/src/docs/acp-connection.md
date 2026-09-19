@@ -43,6 +43,8 @@ tagged with `:oml/error`:
 
 Failures raise `ex-info` tagged with `:oml/error` using the categories above, with the original SDK `Throwable` attached as the exception cause.
 
+Requests use a generous per-request timeout (default 120 seconds), because a real turn runs model inference and tool calls. Pass `:request-timeout-ms` in the `connect` opts map to change it for long turns.
+
 ## Permissions
 
 When the agent asks to perform an action it sends `session/request_permission`. Pass `:on-permission` in the optional `opts` map to `(connect command args env opts)` (env may be `nil`) to decide the outcome:

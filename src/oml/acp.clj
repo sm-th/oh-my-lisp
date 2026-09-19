@@ -23,9 +23,11 @@
    [java.util.concurrent ConcurrentLinkedQueue]
    [java.util.function Consumer Function]))
 
-(def ^:private default-request-timeout
-  "Bounded request timeout applied to every SDK operation initiated by this wrapper."
-  (Duration/ofSeconds 10))
+(def ^:private default-request-timeout-ms
+  "Default per-request timeout in milliseconds for SDK operations. Generous enough for
+  real prompt turns (model inference plus tool calls); override per connection with the
+  opts key :request-timeout-ms."
+  120000)
 
 (defn- ^AgentParameters build-parameters
   "Build AgentParameters from a command, a sequence of args, and an optional env map."
@@ -236,7 +238,8 @@
   is a map; `:on-permission` is a function called with a permission-request map
   `{:session-id s :options [{:option-id ... :name ... :kind ...} ...]}` that returns
   the decision (an option-id string, or :allow, :reject, or :cancel). Without it,
-  permission requests are rejected safely.
+  permission requests are rejected safely. `:request-timeout-ms` overrides the
+  per-request timeout (default 120000); raise it for long agent turns.
 
   Returns a Connection. Throws ex-info tagged with :oml/error on connection,
   protocol-version mismatch, or other protocol failure."
@@ -255,7 +258,7 @@
                           (.add updates
                                 (update->map (.update ^AcpSchema$SessionNotification notification)))))
              c (-> (AcpClient/sync transport)
-                   (.requestTimeout default-request-timeout)
+                   (.requestTimeout (Duration/ofMillis (long (or (:request-timeout-ms opts) default-request-timeout-ms))))
                    (.sessionUpdateConsumer consumer)
                    (.requestPermissionHandler (permission-handler (:on-permission opts)))
                    .build)]
