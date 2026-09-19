@@ -43,6 +43,14 @@ tagged with `:oml/error`:
 
 Failures raise `ex-info` tagged with `:oml/error` using the categories above, with the original SDK `Throwable` attached as the exception cause.
 
+## Permissions
+
+When the agent asks to perform an action it sends `session/request_permission`. Pass `:on-permission` in the optional `opts` map to `(connect command args env opts)` (env may be `nil`) to decide the outcome:
+
+`(connect command args env {:on-permission (fn [req] ...)})`
+
+The callback receives `{:session-id <string> :options [{:option-id <string> :name <string> :kind <keyword>} ...]}` and returns the decision: an option-id string, or `:allow`, `:reject`, or `:cancel`. `:allow` and `:reject` select the first option of that kind. When no `:on-permission` is configured, or the callback throws, the request is rejected safely.
+
 ## What the SDK owns
 
 The wrapper intentionally does not re-implement ACP mechanics. The official SDK is
@@ -56,10 +64,10 @@ responsible for:
 
 ## What this stage excludes
 
-The connection lifecycle currently implements connection, initialization, session creation, and single-turn prompting. It does not yet implement:
+The connection lifecycle currently implements connection, initialization, session creation, single-turn prompting, and permission handling. It does not yet implement:
 
 - Rich modeling of non-text `session/update` kinds (tool calls, plans) and non-text prompt content.
-- Permissions (`session/request_permission`), callbacks, or grants.
+- Grant or authorization design beyond the permission callback.
 - Turn cancellation (`session/cancel`).
 - Capability-gated `session/close`.
 - MCP injection, Lisp Eval exposure, or grant authorization.

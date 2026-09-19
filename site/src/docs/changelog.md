@@ -10,6 +10,11 @@ duplicate of git history.
 
 ## Unreleased
 
+- Implement Stage 1d ACP permission handling (#43).
+  - Route `session/request_permission` to an optional `:on-permission` Lisp callback passed to `connect`, defaulting to a safe reject when unconfigured or when the callback throws.
+  - Extend the fake ACP subprocess and behavior tests to exercise a client-handled permission request (allow, default reject, and callback error).
+  - Document permissions on the [ACP connection](/docs/acp-connection/) page and update this changelog.
+
 - Implement Stage 1c ACP prompt turn (#41).
   - Add `oml.acp/prompt`, sending `session/prompt` and returning `{:stop-reason ... :updates [...]}` with the turn's ordered `session/update` events.
   - Capture streamed `session/update` events per connection via a registered SDK consumer.

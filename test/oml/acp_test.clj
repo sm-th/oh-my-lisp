@@ -36,6 +36,11 @@
   ([behavior env]
    (acp/connect (java-binary) (fake-agent-args behavior) env)))
 
+(defn- connect-fake-with
+  "Connect to the fake agent with the given behavior and connect `opts`."
+  [behavior opts]
+  (acp/connect (java-binary) (fake-agent-args behavior) nil opts))
+
 (defn- process-alive? [pid-str]
   (boolean
    (when-let [pid (try (Long/parseLong (str/trim pid-str)) (catch Throwable _))]
@@ -172,6 +177,40 @@
     (is (some? ex) "expected prompt to throw on an agent-reported failure")
     (is (contains? #{:acp/protocol :acp/agent :acp/connection} (:oml/error (ex-data ex))))
     (is (not= :acp/unknown (:oml/error (ex-data ex))))
+    (acp/close conn)))
+
+(defn- agent-texts [result]
+  (->> (:updates result)
+       (filter #(= :agent-message-chunk (:type %)))
+       (map :text)
+       vec))
+
+(deftest permission-allow-lets-turn-proceed
+  (let [conn (connect-fake-with "prompt-permission" {:on-permission (fn [_] "allow")})
+        sid (:session-id (acp/new-session conn "/tmp"))
+        result (acp/prompt conn sid "do a thing")]
+    (is (= :end-turn (:stop-reason result)))
+    (is (some #{"allow"} (agent-texts result))
+        "agent should observe the allowed option")
+    (acp/close conn)))
+
+(deftest permission-default-rejects
+  (let [conn (connect-fake "prompt-permission")
+        sid (:session-id (acp/new-session conn "/tmp"))
+        result (acp/prompt conn sid "do a thing")]
+    (is (= :end-turn (:stop-reason result)))
+    (is (some #{"reject"} (agent-texts result))
+        "with no handler configured the request is rejected safely")
+    (acp/close conn)))
+
+(deftest permission-callback-error-falls-back-to-reject
+  (let [conn (connect-fake-with "prompt-permission"
+                                {:on-permission (fn [_] (throw (ex-info "boom" {})))})
+        sid (:session-id (acp/new-session conn "/tmp"))
+        result (acp/prompt conn sid "do a thing")]
+    (is (= :end-turn (:stop-reason result)))
+    (is (some #{"reject"} (agent-texts result))
+        "a throwing callback should fall back to safe reject")
     (acp/close conn)))
 
 (defn -main
