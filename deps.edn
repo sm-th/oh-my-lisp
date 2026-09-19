@@ -1,8 +1,8 @@
 ;; oml — a Lisp image you run and inhabit.
 ;;
-;; The JVM kernel deliberately depends on nothing beyond Clojure itself;
-;; init configuration extends the running image rather than the build.
-{:deps {org.clojure/clojure {:mvn/version "1.12.0"}}
+;; The owner kernel stays on Clojure eval; SCI confines grant-scoped eval.
+{:deps {org.babashka/sci {:mvn/version "0.15.58"}
+        org.clojure/clojure {:mvn/version "1.12.0"}}
  :aliases {:oml {:main-opts ["-m" "oml.core"]}
            ;; Focused tests:   clojure -M:test -n oml.kernel-test
            ;; All tests:       clojure -M:test
