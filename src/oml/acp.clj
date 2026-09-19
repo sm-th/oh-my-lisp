@@ -233,7 +233,7 @@
   {:session-id \"<id>\"}. Throws ex-info tagged with :oml/error on failure."
   [^Connection conn ^String cwd]
   (try
-    (let [req (AcpSchema$NewSessionRequest. cwd nil nil nil)
+    (let [req (AcpSchema$NewSessionRequest. cwd [] [] nil)
           ^AcpSchema$NewSessionResponse resp (.newSession ^AcpSyncClient (:client conn) req)]
       {:session-id (.sessionId resp)})
     (catch clojure.lang.ExceptionInfo e
