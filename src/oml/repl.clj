@@ -7,9 +7,9 @@
 
 (def ^:private eval-marker "/eval")
 
-(def ^:private unhandled-message
-  "unhandled natural-language input: nothing was evaluated. Lisp is
-  evaluated when it starts with `(` or when it is marked with `/eval`")
+(def ^:private not-lisp-message
+  "not Lisp: nothing was evaluated. Lisp is evaluated when it starts
+  with `(` or is marked with `/eval`")
 
 (defn- eval-marker-code
   "When `s` is explicitly marked for direct eval, return the marked
@@ -22,12 +22,11 @@
                 (Character/isWhitespace ^Character (first rest)))
         (str/trim rest)))))
 
-(defn- unhandled-result
+(defn- not-lisp-result
   [s]
   {:type :unhandled
-   :kind :natural-language
    :input s
-   :message unhandled-message})
+   :message not-lisp-message})
 
 (defn classify
   "Classify one line of REPL input.
@@ -39,11 +38,13 @@
   - `/eval` alone or followed by
     whitespace                     -> {:type :eval, :code ...} with the
                                       rest of the line as the code
-  - anything else (ordinary text)  -> {:type :unhandled,
-                                      :kind :natural-language, ...}
+  - anything else (ordinary text)  -> {:type :unhandled, :input ...,
+                                      :message ...}
 
-  Ordinary text is never evaluated; it is reported as unhandled until
-  routing for it exists."
+  The kernel REPL evaluates direct Lisp only. Any other input is never
+  evaluated and is reported as a plain not-Lisp result; routing it
+  elsewhere (natural language or otherwise) is a client concern, not
+  the kernel's."
   [line]
   (let [s (str/trim (str line))]
     (cond
@@ -56,15 +57,15 @@
       :else
       (if-some [code (eval-marker-code s)]
         {:type :eval :code code}
-        (unhandled-result s)))))
+        (not-lisp-result s)))))
 
 (defn handle-line
   "Process one line of input. Returns a typed result map:
 
     {:type :blank}
-    {:type :eval, :code code, :value value}   evaluated successfully
-    {:type :eval, :code code, :error error}   evaluation failed
-    {:type :unhandled, :kind :natural-language, :input s, :message m}
+    {:type :eval, :code code, :value value}  evaluated successfully
+    {:type :eval, :code code, :error error}  evaluation failed
+    {:type :unhandled, :input s, :message m} not Lisp, not evaluated
 
   Eval failures are captured as :error, never thrown, so the REPL can
   keep running."

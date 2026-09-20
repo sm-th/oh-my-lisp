@@ -28,13 +28,14 @@
   (is (= :unhandled (:type (repl/classify "/evaluate this"))))
   (is (= :unhandled (:type (repl/classify "/help")))))
 
-(deftest ordinary-text-is-classified-as-unhandled-not-code
+(deftest ordinary-text-is-classified-as-not-lisp
   (doseq [line ["hello there" "some-symbol" "1 + 2" "list files"]]
     (let [r (repl/classify line)]
       (is (= :unhandled (:type r)) line)
-      (is (= :natural-language (:kind r)) line)
+      (is (nil? (:kind r)) line)
       (is (= line (:input r)) line)
       (is (string? (:message r)) line)
+      (is (str/includes? (:message r) "not Lisp") line)
       (is (str/includes? (:message r) "nothing was evaluated") line)
       (is (str/includes? (:message r) "/eval") line))))
 
@@ -76,9 +77,9 @@
     (is (str/includes? out "7"))
     (is (not (str/includes? out "error")))))
 
-(deftest repl-loop-reports-unhandled-text-without-evaluating-it
+(deftest repl-loop-reports-not-lisp-text-without-evaluating-it
   (let [out (run-repl "hello there\n")]
-    (is (str/includes? out "unhandled"))
+    (is (str/includes? out "not Lisp"))
     (is (not (str/includes? out "hello there")))))
 
 (deftest repl-loop-survives-errors-and-keeps-reading
