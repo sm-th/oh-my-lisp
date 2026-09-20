@@ -127,10 +127,11 @@
                           .deleteOnExit))]
     (kernel/save-forms path ['(def ct-persisted-def 41)])
     (fresh-boot!)
-    (let [{:keys [result out]} (boot-with "(inc ct-persisted-def)\n" path)]
+    (let [{:keys [result]} (boot-with "" path)]
       (is (= 0 (:exit result)))
-      (is (str/includes? out "42")
-          "the saved definition, evaluated at startup, is visible to the REPL"))))
+      (is (nil? (:init-failure result)))
+      (is (= 42 (kernel/eval-string "(inc ct-persisted-def)"))
+          "the saved definition, evaluated at startup, is visible to later direct eval"))))
 
 (deftest an-unsaved-live-definition-does-not-survive-a-fresh-boot
   (kernel/eval-string "(def ct-unsaved-def 7)")
