@@ -31,29 +31,82 @@
     (is (str/starts-with? out "oml> "))
     (is (str/includes? out "3"))))
 
-(deftest init-runs-once-before-the-repl-and-shares-its-state
-  (let [f (tmp-init-file "ct-init"
-                         "(defonce ct-boot-count (atom []))"
-                         "(swap! ct-boot-count conj :boot)"
-                         "(def ct-value 10)")
-        {:keys [result out]} (boot-with "(inc ct-value)\n" (.getPath f))]
+(deftest valid-configuration-runs-once-and-decides-not-to-start-anything
+  (let [f (tmp-init-file "ct-decide-nothing"
+                         "(defonce ct-decide-boot-count (atom []))"
+                         "(swap! ct-decide-boot-count conj :boot)"
+                         "(def ct-decide-value 10)")
+        {:keys [result out]} (boot-with "(inc ct-decide-value)\n" (.getPath f))]
     (is (= 0 (:exit result)))
-    (is (str/includes? out "11")
-        "init state is visible to direct eval in the REPL")
-    (is (= 1 (kernel/eval-string "(count @ct-boot-count)"))
-        "init is evaluated exactly once per boot")))
+    (is (= 1 (kernel/eval-string "(count @ct-decide-boot-count)"))
+        "configuration is evaluated exactly once per boot")
+    (is (= "" out)
+        "boot never starts the REPL on its own; a configuration that starts
+        nothing leaves the REPL input untouched")))
 
-(deftest invalid-init-aborts-boot-before-the-repl-starts
+(deftest valid-configuration-can-start-the-built-in-repl-on-the-boot-streams
+  (let [f (tmp-init-file "ct-decide-repl"
+                         "(defonce ct-repl-boot-count (atom []))"
+                         "(swap! ct-repl-boot-count conj :boot)"
+                         "(def ct-repl-value 10)"
+                         "(require '[oml.repl :as repl])"
+                         "(repl/repl-loop *in* *out*)")
+        {:keys [result out]} (boot-with "(inc ct-repl-value)\n" (.getPath f))]
+    (is (= 0 (:exit result)))
+    (is (str/starts-with? out "oml> ")
+        "configuration started the REPL on boot's own input/output streams")
+    (is (str/includes? out "11")
+        "configuration state is visible to the REPL it started")
+    (is (= 1 (kernel/eval-string "(count @ct-repl-boot-count)"))
+        "configuration is evaluated exactly once per boot")))
+
+(deftest failing-configuration-is-reported-and-the-recovery-repl-stays-available
   (let [f (tmp-init-file "ct-bad" "(def ct-never 1\n")
         {:keys [result out]} (boot-with "(+ 1 2)\n" (.getPath f))]
-    (is (= 1 (:exit result)))
-    (is (str/includes? (:message result) (str "failed to load init file "
-                                              (.getPath f))))
-    (is (= "" out)
-        "the REPL must not start when init fails")))
+    (is (= 0 (:exit result))
+        "a failing configuration does not abort the boot")
+    (is (str/includes? (:init-failure result) (str "failed to load init file "
+                                                    (.getPath f))))
+    (is (str/includes? out (str "failed to load init file " (.getPath f)))
+        "the failure is reported on the same stream as the recovery REPL")
+    (is (str/starts-with? out "oml> ")
+        "the plain REPL is offered instead of aborting the process")
+    (is (str/includes? out "3")
+        "the recovery REPL evaluates further input")))
 
-(deftest missing-init-file-aborts-boot
+(deftest missing-init-file-is-reported-and-the-recovery-repl-stays-available
   (let [{:keys [result out]} (boot-with "(+ 1 2)\n" "/no/such/dir/ct-init.clj")]
-    (is (= 1 (:exit result)))
-    (is (str/includes? (:message result) "/no/such/dir/ct-init.clj"))
-    (is (= "" out))))
+    (is (= 0 (:exit result)))
+    (is (str/includes? (:init-failure result) "/no/such/dir/ct-init.clj"))
+    (is (str/includes? out "/no/such/dir/ct-init.clj"))
+    (is (str/starts-with? out "oml> "))
+    (is (str/includes? out "3"))))
+
+;; --- command-line argument parsing -----------------------------------------
+
+(deftest no-arguments-parse-to-no-init-path
+  (is (= {:init-path nil} (core/parse-args []))))
+
+(deftest an-init-file-argument-parses-to-that-path
+  (is (= {:init-path "some/config.clj"} (core/parse-args ["some/config.clj"]))))
+
+(deftest no-init-flag-parses-to-no-init-path
+  (is (= {:init-path nil} (core/parse-args ["--no-init"]))))
+
+(deftest no-init-flag-overrides-any-given-init-file-argument
+  (is (= {:init-path nil} (core/parse-args ["--no-init" "some/config.clj"]))))
+
+(deftest unsupported-argument-shapes-are-a-usage-error
+  (is (= {:usage-error true} (core/parse-args ["a" "b" "c"])))
+  (is (= {:usage-error true} (core/parse-args ["some/config.clj" "extra"]))))
+
+(deftest no-init-flag-boots-the-plain-repl-without-loading-configuration
+  (let [f (tmp-init-file "ct-no-init" "(def ct-no-init-var 99)")
+        {:keys [init-path]} (core/parse-args ["--no-init" (.getPath f)])
+        {:keys [result out]} (boot-with "(+ 1 2)\n" init-path)]
+    (is (nil? init-path))
+    (is (= 0 (:exit result)))
+    (is (str/starts-with? out "oml> "))
+    (is (str/includes? out "3"))
+    (is (thrown? Exception (kernel/eval-string "ct-no-init-var"))
+        "the configuration was never loaded")))
