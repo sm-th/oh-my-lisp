@@ -9,7 +9,7 @@ set -euo pipefail
 
 oml_home="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if [[ $# -gt 0 && "$1" != /* ]]; then
+if [[ $# -gt 0 && "$1" != -* && "$1" != /* ]]; then
   set -- "$PWD/$1" "${@:2}"
 fi
 
