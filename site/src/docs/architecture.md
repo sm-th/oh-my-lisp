@@ -7,120 +7,109 @@ order: 1
 ---
 # Architecture
 
-This document records oml's **accepted** architecture — the design the project is
-building to, including decisions already shipped and decisions accepted but not yet
-implemented. The long-term aspiration is on the [home page](/); the record of
-what has actually shipped is in the [Changelog](/docs/changelog/). The authoritative
-design record is issue [#30](https://github.com/sm-th/oh-my-lisp/issues/30).
+This document is the architectural view of oml: how a minimal kernel and the layers
+built on it fit together. It is **accepted** architecture — decisions already shipped
+and decisions accepted but not yet implemented, marked inline below. The kernel itself
+is specified in full on the [Kernel](/docs/kernel/) page; its design record is issue
+[#55](https://github.com/sm-th/oh-my-lisp/issues/55). The ACP client layer follows its
+own design record, issue [#30](https://github.com/sm-th/oh-my-lisp/issues/30). The
+[Changelog](/docs/changelog/) records what has actually shipped.
 
 <p class="status">
-<strong>Status:</strong> v0.1.0 ships the local ACP v1 client. The persistent image,
-the grant, the natural-language front, and agent discovery are accepted directions at
+<strong>Status:</strong> the kernel and the ACP client layer's v0.1.0 stage are shipped.
+The grant, a natural-language client, and agent discovery are accepted directions at
 earlier stages of delivery, marked inline below.
 </p>
 
-## Shape: image, drivers, and agents
+## Kernel and layers
 
-- **The image (body).** oml is a persistent Lisp image: its objects, state, and skills
-  are meant to survive restarts. Everything that acts on the image does so through a
-  single **eval surface** — one way to affect the image.
-- **Drivers (minds).** A driver acts *through* the eval surface: a human at the REPL, a
-  headless script, or an attached AI. The image persists and grows; drivers are
-  swappable.
-- **External agents.** oml also connects to **external coding agents** over the
-  [Agent Client Protocol](https://agentclientprotocol.com/) (ACP). Such an agent is a
-  separate process that runs its own model and tool loop; oml does not embed or recreate
-  it.
+oml is a **kernel** plus **layers**. The kernel is the minimal living-image substrate:
+one shared, mutable eval surface, explicit-file persistence, configuration-as-program,
+and a recovery REPL that survives a broken configuration. Everything else — reaching an
+external agent, bounding the eval surface for a less-trusted driver, natural-language
+routing, orchestration — is a layer: Lisp loaded onto the kernel through the same eval
+surface everything else uses, never a kernel primitive itself.
 
-## Two loops
+The deletion test from #55 draws the line: removing any one layer — the ACP client, a
+grant, a client — leaves the eval surface, persistence, and recovery intact. An
+abstract seam for a capability is added only once a second concrete implementation of
+it exists; a single adapter (ACP) does not justify one yet.
 
-oml is a glue layer between two distinct loops:
+## The eval surface
 
-1. **Lisp application loop** — decides when work is needed, selects configured behavior,
-   sends an ACP prompt, consumes the streamed updates and the final outcome, and
-   continues the application.
-2. **Coding-agent loop** — an external agent owns model interaction, context management,
-   tool selection and iteration, and its native file, shell, git, pull-request, and
-   skills capabilities.
+Every actor that affects the image — a human at the REPL, loaded configuration, or an
+external input routed in by a layer — does so the same way: evaluating Lisp forms in
+the shared runtime namespace. There is no second privileged path in. The kernel's eval
+surface is full-trust; a grant layer narrows it for a less-trusted driver without
+changing the surface itself. See [Kernel](/docs/kernel/) for the exact input
+classification and console examples.
 
-**ACP is the boundary between the loops.** The Lisp loop invokes a turn; the agent
-decides how to perform it. oml is not coupled to any specific agent product.
+## Layers on the kernel
 
-## Responsibility split
+### ACP client — bundled layer; shipped (v0.1.0)
 
-**oml owns:** Lisp application behavior and user-facing integration; explicit Lisp
-configuration and selection of a local agent command; local subprocess lifetime and
-ACP v1 JSON-RPC over stdio (carried by the official Apache-2.0 ACP Java SDK); protocol
-and capability negotiation; session creation, prompt submission, update delivery,
-cancellation, final stop-reason handling, and predictable shutdown; an
-instance-configured Lisp permission handler.
+`oml.acp` connects the image to an **external coding agent** over the
+[Agent Client Protocol](https://agentclientprotocol.com/) (ACP): a separate process
+that runs its own model and tool loop, which oml does not embed or recreate. It is a
+thin Clojure wrapper over the official `com.agentclientprotocol:acp-core` SDK: connect
+and `initialize`, capability negotiation, `session/new`, `session/prompt` with streamed
+`session/update` events and a final stop reason, `session/request_permission` routed to
+a Lisp callback, `session/cancel`, and capability-gated `session/close`. The SDK owns
+JSON-RPC framing, request correlation, and subprocess lifecycle.
 
-**The external agent and deployment own:** installation and updates; provider, model,
-authentication, credentials, and native product configuration; the model and tool loop
-and the agent's native file, shell, git, pull-request, skills, sandbox, and permission
-behavior.
-
-oml does not claim that ACP itself supplies coding capabilities; it connects to an agent
-that does.
-
-## Core components
-
-### Interpreter
-
-A Lisp of the Clojure family. v0.1.0 runs on a full JVM via Clojure. A lightweight
-babashka/SCI runtime is an accepted future possibility, not a current commitment.
-
-### ACP client — shipped (v0.1.0)
-
-`oml.acp` is a thin Clojure wrapper over the official
-`com.agentclientprotocol:acp-core` SDK: connect and `initialize`, capability
-negotiation, `session/new`, `session/prompt` with streamed `session/update` events and a
-final stop reason, `session/request_permission` routed to a Lisp callback,
-`session/cancel`, and capability-gated `session/close`. The SDK owns JSON-RPC framing,
-request correlation, and subprocess lifecycle. See
-[ACP connection](/docs/acp-connection/) and
+The client sits at the boundary of oml's **two-loop model**: a Lisp application loop
+decides when work is needed, selects configured behavior, sends an ACP prompt, and
+consumes the streamed updates and final outcome; a coding-agent loop — owned entirely
+by the external agent — handles model interaction, context management, tool selection
+and iteration, and its native file, shell, git, pull-request, and skills capabilities.
+ACP is the boundary between the loops; oml is not coupled to any specific agent
+product. See [ACP connection](/docs/acp-connection/) and
 [ACP client architecture](/docs/acp-architecture/).
 
-### Persistent image — accepted; partial
+### Grant — accepted layer; not yet implemented
 
-Durable state that survives restarts: objects and their behavior saved and restored, so
-a launch resumes where the previous one left off. The image *is* the memory.
+A deny-by-default eval surface for a less-trusted driver: it sees exactly the
+vocabulary it was granted — a bounded set of verbs, never ambient authority. Two
+authorities coexist in one image: the owner, with full reach through the kernel eval
+surface, and an attached driver, confined to its granted vocabulary. A grant is
+distinct from ACP permissions, which govern what an *external* agent may do during a
+turn; grant and authorization design is deferred (#30).
 
-### Grant — accepted; not yet implemented
+### Natural-language client — accepted layer; not yet implemented
 
-A deny-by-default eval surface: a driver sees exactly the vocabulary it was granted — a
-bounded set of verbs, never ambient authority. Two authorities coexist in one image: the
-**owner**, with full reach, and an **attached driver**, confined to its granted
-vocabulary. The grant governs the **eval surface** inside the image; it is distinct from
-ACP permissions, which govern what an *external* agent may do during a turn. Grant and
-authorization design is deferred (#30).
-
-### Natural-language front — accepted; not yet implemented
-
-The intended default way to drive oml is natural language: a request interpreted by the
-attached mind, which acts in the image through the grant. Today the built-in REPL
-evaluates Lisp entered directly; natural-language routing is not yet implemented.
+The intended default way to drive oml is natural language: a request interpreted by
+the attached driver, which acts in the image through a grant. Today the built-in REPL
+evaluates direct Lisp only — a line starting with `(` or `/eval` — and reports
+anything else as un-evaluated text; natural-language routing is a client layer that
+does not exist yet.
 
 ### Skills — accepted
 
-Successful workflows persisted as named, reusable capabilities. An image accumulates
-skills over its lifetime, so the vocabulary the owner and drivers can invoke grows with
-use.
+A successful workflow saved through the kernel's explicit-file persistence becomes a
+named, reusable capability. Skills are not a separate kernel primitive: they are what
+persistence looks like once an owner or an attached driver starts naming what it
+saves. An image accumulates skills over its lifetime, so the vocabulary invokable
+through it grows with use.
 
 ### Extension seam
 
-Capabilities are added to an image by import, declared in the image's configuration. The
-core provides the seam; what is imported — tools, verbs, integrations, connected agents —
-is the owner's choice.
+Layers are added to an image by import, declared in the image's configuration. The
+kernel provides only the seam the configuration runs through; what is imported —
+tools, verbs, integrations, connected agents — is the owner's choice.
 
 ## Configuration
 
-Configuration is executable Lisp, never slash commands. An image reads its configuration
-(identity, where it persists, its default grant, the capabilities and agents it imports)
-and is specialized by running the binary against it. A missing configured default agent
-is non-fatal: agent-independent Lisp use still starts.
+Configuration is executable Lisp, never slash commands: the same
+configuration-as-program mechanism the kernel uses to build a ready image at startup
+(see [Kernel](/docs/kernel/)). A configuration can declare identity, where the image
+persists, a default grant, and the layers and agents it imports. A missing configured
+default agent is non-fatal: agent-independent Lisp use still starts.
 
 ## Staged delivery
+
+The kernel — eval surface, explicit-file persistence, recovery boot,
+configuration-as-program — is fully delivered; see [Kernel](/docs/kernel/) and its
+design record (#55). The ACP client layer ships in stages:
 
 - **Stage 0 (#27)** — documentation-site workflow and published design. Merged.
 - **Stage 1 (#28)** — local ACP v1 client lifecycle. Merged; shipped in v0.1.0.
