@@ -83,7 +83,7 @@
           ];
           oml = pkgs.stdenvNoCC.mkDerivation {
             pname = "oml";
-            version = "0.1.0";
+            version = "0.2.0";
             src = ./src;
             dontBuild = true;
             installPhase = ''
@@ -140,7 +140,7 @@
           '';
           site = pkgs.buildNpmPackage {
             pname = "oml-site";
-            version = "0.1.0";
+            version = "0.2.0";
             src = ./site;
             npmDepsHash = "sha256-w5lFWRkLz/Sk/e4Jm4t4I+oq6wKQpBYWe8jxOb0apTw=";
             buildPhase = ''

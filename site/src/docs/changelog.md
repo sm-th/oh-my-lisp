@@ -10,6 +10,19 @@ order: 4
 This page records notable changes to oh-my-lisp. It is a high-level summary, not a
 duplicate of git history.
 
+## 0.2.0 — 2026-09-20
+
+The living-image kernel and its documentation, on top of the v0.1.0 ACP client.
+
+- Explicit-file persistence (#57).
+  - Add `oml.kernel/evaluate-file`, `save-forms`, `save-and-evaluate`, and `save-data`/`load-data`; nothing survives a restart unless it was explicitly saved.
+- Recovery boot and a Lisp-only kernel REPL (#56).
+  - No configuration starts the plain REPL; a broken configuration is reported and the plain REPL starts anyway; add the `--no-init` flag. The kernel REPL evaluates direct Lisp only.
+- Document the living-image kernel on the site (#62).
+- Dedicated documentation-site layout: sidebar navigation, an on-page table of contents, and a light/dark theme (#61, #65).
+- Align the README, home page, and existing docs to the concept — a Lisp for AI (#66).
+- Fix `bin/oml` so option flags such as `--no-init` pass through to the runtime (#71).
+
 ## 0.1.0 — 2026-09-19
 
 First tagged release: a complete local ACP v1 client over the official ACP Java SDK.
