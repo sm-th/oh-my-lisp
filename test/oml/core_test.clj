@@ -25,6 +25,14 @@
      (.deleteOnExit f)
      f)))
 
+(defn- fresh-boot!
+  "Discard the shared runtime namespace and recreate it empty,
+  simulating a fresh process boot within this JVM: no definition
+  survives unless it was explicitly saved to a file and re-evaluated."
+  []
+  (remove-ns kernel/runtime-ns)
+  (kernel/ensure-runtime))
+
 (deftest boot-without-init-presents-the-built-in-repl
   (let [{:keys [result out]} (boot-with "(+ 1 2)\n" nil)]
     (is (= 0 (:exit result)))
@@ -110,3 +118,24 @@
     (is (str/includes? out "3"))
     (is (thrown? Exception (kernel/eval-string "ct-no-init-var"))
         "the configuration was never loaded")))
+
+;; --- explicit-file persistence at startup ----------------------------------
+
+(deftest a-definition-saved-to-a-file-is-present-after-a-fresh-boot
+  (let [path (.getPath (doto (File/createTempFile "ct-persist" ".clj")
+                          .delete
+                          .deleteOnExit))]
+    (kernel/save-forms path ['(def ct-persisted-def 41)])
+    (fresh-boot!)
+    (let [{:keys [result out]} (boot-with "(inc ct-persisted-def)\n" path)]
+      (is (= 0 (:exit result)))
+      (is (str/includes? out "42")
+          "the saved definition, evaluated at startup, is visible to the REPL"))))
+
+(deftest an-unsaved-live-definition-does-not-survive-a-fresh-boot
+  (kernel/eval-string "(def ct-unsaved-def 7)")
+  (fresh-boot!)
+  (let [{:keys [result out]} (boot-with "(inc ct-unsaved-def)\n" nil)]
+    (is (= 0 (:exit result)))
+    (is (str/includes? out "Unable to resolve symbol")
+        "the fresh boot has no memory of the unsaved definition")))
