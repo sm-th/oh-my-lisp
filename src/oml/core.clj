@@ -2,11 +2,13 @@
   "oml entry point.
 
   Boots the shared runtime and the plain Lisp REPL — the recovery
-  floor that is always available. Optional configuration is evaluated
-  once and decides what runs next; it extends the runtime and never
-  replaces the built-in REPL. Configuration that fails to load or
-  evaluate is reported and the plain REPL starts anyway, so the image
-  stays reachable for repair."
+  floor that is always available. Optional configuration — including
+  any file previously written by `oml.kernel/save-forms` — is
+  evaluated once, via `oml.kernel/evaluate-file`, and decides what
+  runs next; it extends the runtime and never replaces the built-in
+  REPL. Configuration that fails to load or evaluate is reported and
+  the plain REPL starts anyway, so the image stays reachable for
+  repair."
   (:require [oml.kernel :as kernel]
             [oml.repl :as repl]))
 
@@ -46,7 +48,7 @@
        (do (repl/repl-loop in out)
            {:exit 0})
        (let [failure (try
-                       (kernel/load-init init-path)
+                       (kernel/evaluate-file init-path)
                        nil
                        (catch Throwable t
                          (report-init-failure init-path t)))]
