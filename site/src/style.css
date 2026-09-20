@@ -195,16 +195,72 @@ a, button, input, textarea, select, [tabindex]:not([tabindex="-1"]) {
  * Main containers
  * -------------------------------------------------------------------------- */
 
-main, article, .docs-index {
+main {
   max-width: var(--content-width);
   margin: 0 auto;
-}
-
-main {
   padding: var(--space-16) 0 var(--space-24);
 }
 
-article, .docs-index {
+/* --------------------------------------------------------------------------
+ * Documentation layout (sidebar + article)
+ * -------------------------------------------------------------------------- */
+
+.docs-layout {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-10);
+}
+
+.docs-sidebar {
+  padding: var(--space-12) 0 var(--space-24);
+  min-width: 0;
+}
+
+.docs-sidebar-heading {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.docs-sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.docs-sidebar a {
+  display: block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  border-left: 2px solid transparent;
+}
+
+.docs-sidebar a:hover {
+  color: var(--color-link-hover);
+  background: var(--color-surface);
+}
+
+.docs-sidebar a[aria-current="page"] {
+  color: var(--color-text);
+  font-weight: 600;
+  background: var(--color-surface-raised);
+  border-left-color: var(--color-accent);
+}
+
+.docs-layout article {
+  min-width: 0;
+  max-width: var(--content-width);
   padding: var(--space-12) 0 var(--space-24);
 }
 
@@ -519,6 +575,38 @@ article .note {
  * Responsive
  * -------------------------------------------------------------------------- */
 
+@media (max-width: 860px) {
+  .docs-layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .docs-sidebar {
+    padding: var(--space-8) 0 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .docs-sidebar ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+  }
+
+  .docs-sidebar a {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+  }
+
+  .docs-sidebar a[aria-current="page"] {
+    border-left-color: transparent;
+    border-bottom-color: var(--color-accent);
+  }
+
+  .docs-layout article {
+    padding-top: var(--space-6);
+  }
+}
+
 @media (max-width: 640px) {
   body {
     padding: 0 var(--space-4);
@@ -528,8 +616,8 @@ article .note {
     padding: var(--space-10) 0 var(--space-16);
   }
 
-  article, .docs-index {
-    padding: var(--space-8) 0 var(--space-16);
+  .docs-layout article {
+    padding: var(--space-4) 0 var(--space-16);
   }
 
   .brand {
