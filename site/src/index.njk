@@ -1,7 +1,7 @@
 ---
 layout: base.njk
 title: "oh-my-lisp"
-description: "A personal, persistent, self-evolving Lisp you talk to."
+description: "oml is a persistent Lisp environment for AI: a runtime you and an attached agent drive, extend, and grow over time."
 ---
 <main>
   <header class="hero">
@@ -11,68 +11,76 @@ description: "A personal, persistent, self-evolving Lisp you talk to."
     </div>
     <p class="tagline"><em>There is no language but Lisp, and AI is its application.</em></p>
     <p class="lead">
-      A personal, persistent, self-evolving Lisp you drive in natural language —
-      and, when you want precision, in Lisp directly.
+      oml is a persistent Lisp environment: definitions, data, and state are
+      defined, run, saved, and rewritten in place, and survive restarts. You and
+      an attached agent drive it through the same eval surface, extend it, and
+      grow it over time — it stays yours, not a disposable session.
     </p>
-    <pre class="term"><span class="cmd">$ oml</span>
-oml 0.1 · image restored — 42 objects, 17 skills
-talk to me. <span class="dim">(drop to Lisp with a leading form)</span>
-
-<span class="you">you&gt;</span> summarize project X and save it as a skill "weekly-x"
-<span class="oml">oml&gt;</span> done — saved skill weekly-x; next time just say "weekly X".
-
-<span class="you">you&gt;</span> (skills)
-=&gt; (:recall :note :weekly-x …)</pre>
+    <pre class="term"><span class="cmd">$ bin/oml</span>
+<span class="oml">oml&gt;</span> (def greeting "hi")
+#'oml.user/greeting
+<span class="oml">oml&gt;</span> (oml.kernel/save-forms "greeting.clj" '[(def greeting "hi")])
+"greeting.clj"
+<span class="oml">oml&gt;</span> hello there
+<span class="dim">oml: not Lisp: nothing was evaluated. Lisp is evaluated when it starts with `(` or is marked with `/eval`</span>
+<span class="oml">oml&gt;</span> /eval (+ 1 2)
+3</pre>
     <p class="cta"><a href="https://github.com/sm-th/oh-my-lisp">GitHub →</a></p>
   </header>
 
   <section class="why">
     <div class="card">
-      <h2>A body that remembers</h2>
-      <p>A bare model forgets. oml is a persistent image — its objects, state, and
-      learned skills survive restarts. Yesterday's work is still here today.</p>
+      <h2>One eval surface</h2>
+      <p>Everything that touches the image — a human at the REPL, loaded
+      configuration, or an attached agent — acts the same way: by evaluating
+      Lisp in one shared, mutable runtime namespace. No side channel.</p>
     </div>
     <div class="card">
-      <h2>It grows</h2>
-      <p>Every request is fulfilled by running Lisp in the image. When a workflow
-      works, it is kept as a named skill — so the longer you live with an image, the
-      better it understands you.</p>
+      <h2>Explicit persistence</h2>
+      <p>Nothing survives a restart unless it was explicitly saved. Definitions
+      and data round-trip through readable Lisp and EDN files, so what you build
+      stays yours after the process exits and comes back.</p>
     </div>
     <div class="card">
-      <h2>Natural language first</h2>
-      <p>You talk to it. Lisp is the precision layer underneath, there when you want
-      it. This is the difference between a toolkit and a companion.</p>
+      <h2>Always repairable</h2>
+      <p>If loaded configuration fails, oml reports the failure and starts the
+      plain REPL anyway. The image is never bricked by its own code — you can
+      always get back in and fix it.</p>
     </div>
     <div class="card">
-      <h2>Safe to inhabit</h2>
-      <p>The agent acts through a deny-by-default grant — a bounded vocabulary, not
-      ambient power. Safe to hand a capable but untrusted mind the keys.</p>
+      <h2>Layers, not the core</h2>
+      <p>Reaching an AI model or agent, bounding what it may touch, and every
+      interface on top are layers loaded onto the kernel in Lisp — not baked
+      into it. Remove a layer and the kernel underneath is untouched.</p>
     </div>
   </section>
 
   <section class="loop">
-    <h2>The loop</h2>
-    <pre class="flow">natural language
-  → the agent composes and runs Lisp in the image
-     → if it works, it is saved as a skill
-        → next time that intent is a known capability,
-           and your language is understood more richly</pre>
-    <p class="note">A plain assistant cannot do this — it has no persistent body in
-    which a vocabulary can accumulate. oml does.</p>
+    <h2>How it grows</h2>
+    <pre class="flow">you evaluate Lisp in the image
+  → save-forms or save-and-evaluate writes it to a file
+     → evaluate-file restores it the next time oml starts
+        → what you built is still there, ready to build on</pre>
+    <p class="note">A stateless assistant starts over every session. oml carries
+    forward what you already built into it.</p>
   </section>
 
   <section class="docs-cta">
     <h2>Where it stands</h2>
-    <p>This page is the north star. Today, oml ships a local ACP v1 client
-    (v0.1.0): it drives an external coding agent over the Agent Client Protocol.</p>
-    <p>Read the <a href="/docs/architecture/">architecture</a>, the accepted
+    <p>Early, and now runnable. The kernel — the eval surface,
+    explicit-file persistence, and recovery boot — is in place, with an ACP
+    client bundled as the first layer on top, reaching an external coding agent
+    over the Agent Client Protocol.</p>
+    <p>Read the <a href="/docs/kernel/">kernel</a>, the
+    <a href="/docs/architecture/">architecture</a>, the accepted
     <a href="/docs/acp-architecture/">ACP client design</a>, how to
     <a href="/docs/acp-connection/">connect</a>, and the
     <a href="/docs/changelog/">changelog</a>.</p>
   </section>
 
   <footer>
-    <p>oml is <em>yours</em> — it starts small and gains capabilities by import.</p>
+    <p>oml stays yours — the kernel is minimal, and every layer you use is
+    added by import.</p>
     <p class="links"><a href="https://github.com/sm-th/oh-my-lisp">github.com/sm-th/oh-my-lisp</a></p>
   </footer>
 </main>
