@@ -21,12 +21,10 @@
       var root = document.documentElement;
       try {
         var stored = localStorage.getItem("oml-docs-theme");
-        var theme = stored === "light" || stored === "dark"
-          ? stored
-          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        var theme = (stored === "light" || stored === "dark") ? stored : "dark";
         root.setAttribute("data-docs-theme", theme);
       } catch (err) {
-        root.setAttribute("data-docs-theme", "light");
+        root.setAttribute("data-docs-theme", "dark");
       }
     })();
   </script>
