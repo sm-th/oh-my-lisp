@@ -1,6 +1,6 @@
 ---
 layout: docs.njk
-title: "ACP connection — oh-my-lisp"
+title: "ACP connection"
 description: "Connecting to a local ACP agent through the official Java SDK."
 navTitle: "ACP connect"
 order: 3

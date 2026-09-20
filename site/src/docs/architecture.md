@@ -1,6 +1,6 @@
 ---
 layout: docs.njk
-title: "Architecture — oh-my-lisp"
+title: "Architecture"
 description: "The accepted architecture of oml: a programmable Lisp image and ACP client."
 navTitle: "Architecture"
 order: 1
