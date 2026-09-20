@@ -7,10 +7,13 @@ order: 3
 ---
 # ACP connection
 
-oml connects to a local coding agent through the [Agent Client Protocol](https://agentclientprotocol.com/)
-(ACP) over stdio. Issue #35 implements the first slice of that lifecycle: launch a
-configured agent command, complete the `initialize` handshake, expose the negotiated
-capabilities, and close the connection safely.
+`oml.acp` is a bundled **layer** that connects an image to a local coding agent over
+the [Agent Client Protocol](https://agentclientprotocol.com/) (ACP) over stdio — one
+way to reach an external agent, not the [kernel](/docs/kernel/) itself. This page
+documents the full v0.1.0 lifecycle: launch a configured agent command, complete the
+`initialize` handshake, expose the negotiated capabilities, create a session, send a
+prompt with streamed updates, handle permissions, cancel a turn, and close the
+connection safely.
 
 ## Public interface
 
@@ -76,7 +79,7 @@ responsible for:
 - Subprocess reaping, including bounded TERM/KILL shutdown.
 - The `initialize` request/response exchange.
 
-## What this stage excludes
+## What this layer excludes
 
 The connection lifecycle currently implements connection, initialization, session creation, single-turn prompting, permission handling, turn cancellation, and capability-gated session close. It does not yet implement:
 

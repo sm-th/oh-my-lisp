@@ -8,16 +8,21 @@ order: 2
 # ACP client architecture
 
 <p class="status">
-<strong>Status:</strong> Accepted design record. Stage 1a (local stdio connection
-and v1 initialization) is implemented. Later Stage 1 children (sessions, prompt
-turns, permissions, cancellation, close) are planned and tracked in GitHub issues.
+<strong>Status:</strong> Accepted design record. v0.1.0 ships the complete local ACP v1
+client lifecycle described below: connect, sessions, prompts with streamed updates,
+permissions, cancellation, and capability-gated close.
 </p>
 
 ## Decision
 
-**oml** is a programmable Lisp [Agent Client Protocol](https://agentclientprotocol.com/)
-(ACP) client and glue layer. It does not embed or recreate a coding-agent loop and it is
-not coupled to a specific harness.
+`oml.acp` is a **layer** bundled in the oml repository: a programmable Lisp
+[Agent Client Protocol](https://agentclientprotocol.com/) (ACP) client that lets an
+image reach an external coding agent. It is not oml's identity — the kernel (the eval
+surface, explicit-file persistence, recovery boot, and configuration-as-program;
+see [Kernel](/docs/kernel/) and design record
+[#55](https://github.com/sm-th/oh-my-lisp/issues/55)) is complete without it, and
+removing this layer leaves the kernel intact. It does not embed or recreate a
+coding-agent loop and it is not coupled to a specific harness.
 
 There are two distinct loops:
 
@@ -33,17 +38,18 @@ how to perform that turn.
 
 ## Responsibility split
 
-### oml owns
+### The ACP client layer owns
 
 - Lisp application behavior and user-facing integration.
 - Explicit Lisp configuration and selection of a local agent command.
 - Local subprocess lifetime and ACP v1 JSON-RPC over stdio, **carried by the official
-  Apache-2.0 ACP Java SDK** (`com.agentclientprotocol:acp-core:0.16.0`). oml is a thin
-  Clojure-facing wrapper over the SDK's synchronous stdio client and transport; the SDK
-  owns JSON framing, UTF-8 handling, request/response correlation, stderr handling, and
-  subprocess reaping, and oml verifies those behaviors rather than re-implementing them.
+  Apache-2.0 ACP Java SDK** (`com.agentclientprotocol:acp-core:0.16.0`). `oml.acp` is a
+  thin Clojure-facing wrapper over the SDK's synchronous stdio client and transport; the
+  SDK owns JSON framing, UTF-8 handling, request/response correlation, stderr handling,
+  and subprocess reaping, and the wrapper verifies those behaviors rather than
+  re-implementing them.
 - Protocol-version and capability negotiation through the SDK's `initialize` handshake,
-  exposed to later children as Clojure-facing values.
+  exposed as Clojure-facing values.
 - Session creation, prompt submission, update delivery, cancellation, final stop-reason
   handling, and predictable shutdown.
 - An instance-configured Lisp permission handler.
@@ -55,8 +61,8 @@ how to perform that turn.
 - The model/tool loop and native files, shell, git, pull-request, skills, sandbox, and
   product permission behavior.
 
-oml does not claim that ACP itself supplies those coding capabilities; it connects to an
-agent that does.
+`oml.acp` does not claim that ACP itself supplies those coding capabilities; it
+connects to an agent that does.
 
 ## ACP v1 lifecycle
 
@@ -77,21 +83,27 @@ The first protocol implementation is local only:
 No client filesystem or terminal callbacks are advertised in v1. The selected coding
 agent uses its own tools.
 
-## Current scope: Stage 1a
+## Current scope: Stage 1 (shipped in v0.1.0)
 
-Issue #35 delivers the first reviewed slice:
+Issues #35, #39, #41, #43, #45, and #47 delivered this layer one reviewed slice at a
+time:
 
 - `oml.acp/connect` launches a configured command, creates the SDK stdio transport and
   sync client, and completes the `initialize` handshake.
 - `oml.acp/capabilities` returns the negotiated capabilities as a Clojure map, including
   `:protocol-version`.
+- `oml.acp/new-session` creates an ACP session and returns `{:session-id "..."}`.
+- `oml.acp/prompt` sends a prompt, delivers streamed `session/update` events, and
+  returns the final stop reason.
+- `oml.acp/cancel` sends `session/cancel` to end an in-flight turn.
+- `oml.acp/close-session` closes one session via `session/close` when the agent
+  advertised the capability.
 - `oml.acp/close` closes the connection idempotently and with a bounded wait.
 - SDK failures are translated into stable `ex-info` categories under `:oml/error`:
   `:acp/connection`, `:acp/protocol`, `:acp/capability`, and `:acp/unknown`.
 
-This stage deliberately does **not** implement sessions, prompts, events, permissions,
-cancellation, MCP, Lisp Eval, grants, discovery, remote transports, or provider/auth
-configuration.
+This layer deliberately does **not** implement MCP injection, Lisp Eval exposure,
+grants, agent discovery, remote transports, or provider/auth configuration.
 
 ## Configuration, absence, and discovery
 
@@ -115,7 +127,7 @@ is a protocol policy hook, not a claim that every agent action is mediated by AC
 ## Deferred work
 
 MCP injection, Lisp Eval exposure, and grant/authorization design are explicitly
-deferred. They are not prerequisites for the local ACP lifecycle or catalog/startup
+deferred. They are not prerequisites for the shipped ACP lifecycle or catalog/startup
 stages, and no implementation issue is open for them now.
 
 ## Exclusions
@@ -132,14 +144,15 @@ stages, and no implementation issue is open for them now.
 
 - **Stage 0** — establish and merge the documentation-site workflow and publish this
   design. (Merged.)
-- **Stage 1** — local ACP v1 client lifecycle.
+- **Stage 1** — local ACP v1 client lifecycle. Merged; shipped in v0.1.0.
   - **1a** — connect and initialize v1 (#35, implemented).
-  - **1b** — `session/new` and session lifecycle.
-  - **1c** — `session/prompt`, updates, and stop reasons.
-  - **1d** — permission handling.
-  - **1e** — cancellation and graceful close.
+  - **1b** — `session/new` and session lifecycle (#39, implemented).
+  - **1c** — `session/prompt`, updates, and stop reasons (#41, implemented).
+  - **1d** — permission handling (#43, implemented).
+  - **1e** — turn cancellation (#45, implemented).
+  - **1f** — capability-gated session close (#47, implemented).
 - **Stage 2** — maintained catalog, Lisp configuration generation, and startup behavior;
-  depends on Stage 1.
+  depends on Stage 1. Accepted; not started.
 
 Every implementation change ships its relevant English documentation in the same pull
 request, publishes it through the project site and navigation, and passes the site build
