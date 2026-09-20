@@ -2,6 +2,8 @@
 layout: docs.njk
 title: "Changelog — oh-my-lisp"
 description: "Notable changes to the oh-my-lisp project."
+navTitle: "Changelog"
+order: 4
 ---
 # Changelog
 

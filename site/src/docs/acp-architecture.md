@@ -2,6 +2,8 @@
 layout: docs.njk
 title: "ACP client architecture — oh-my-lisp"
 description: "Accepted design for the oh-my-lisp ACP v1 client."
+navTitle: "ACP design"
+order: 2
 ---
 # ACP client architecture
 

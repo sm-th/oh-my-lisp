@@ -1,6 +1,16 @@
 ---
 layout: base.njk
 ---
-<article>
+<div class="docs-layout">
+  <aside class="docs-sidebar" aria-label="Documentation pages">
+    <p class="docs-sidebar-heading">Documentation</p>
+    <ul>
+      {%- for docPage in collections.docsNav %}
+      <li><a href="{{ docPage.url }}"{% if docPage.url == page.url %} aria-current="page"{% endif %}>{{ docPage.data.navTitle }}</a></li>
+      {%- endfor %}
+    </ul>
+  </aside>
+  <article{% if page.url == "/docs/" %} class="docs-index"{% endif %}>
 {{ content | safe }}
-</article>
+  </article>
+</div>
