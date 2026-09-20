@@ -1,5 +1,5 @@
 // Documentation pages: persisted light/dark toggle and "On this page" scrollspy.
-// The initial theme (localStorage, falling back to prefers-color-scheme) is
+// The initial theme (localStorage, defaulting to dark) is
 // applied synchronously in base.njk to avoid a flash of the wrong theme; this
 // script only handles the toggle interaction and the TOC active-section state.
 (function () {
