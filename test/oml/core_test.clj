@@ -67,9 +67,9 @@
         "a failing configuration does not abort the boot")
     (is (str/includes? (:init-failure result) (str "failed to load init file "
                                                     (.getPath f))))
-    (is (str/includes? out (str "failed to load init file " (.getPath f)))
-        "the failure is reported on the same stream as the recovery REPL")
-    (is (str/starts-with? out "oml> ")
+    (is (str/starts-with? out (str "oml: failed to load init file " (.getPath f)))
+        "the failure is reported first, on the same stream as the recovery REPL")
+    (is (str/includes? out "oml> ")
         "the plain REPL is offered instead of aborting the process")
     (is (str/includes? out "3")
         "the recovery REPL evaluates further input")))
@@ -78,8 +78,8 @@
   (let [{:keys [result out]} (boot-with "(+ 1 2)\n" "/no/such/dir/ct-init.clj")]
     (is (= 0 (:exit result)))
     (is (str/includes? (:init-failure result) "/no/such/dir/ct-init.clj"))
-    (is (str/includes? out "/no/such/dir/ct-init.clj"))
-    (is (str/starts-with? out "oml> "))
+    (is (str/starts-with? out "oml: failed to load init file /no/such/dir/ct-init.clj"))
+    (is (str/includes? out "oml> "))
     (is (str/includes? out "3"))))
 
 ;; --- command-line argument parsing -----------------------------------------
