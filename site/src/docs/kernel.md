@@ -1,6 +1,6 @@
 ---
 layout: docs.njk
-title: "Kernel — oh-my-lisp"
+title: "Kernel"
 description: "The living-image kernel: the eval surface, explicit-file persistence, recovery boot, and the kernel/layer boundary."
 navTitle: "Kernel"
 order: 1.5

@@ -1,6 +1,6 @@
 ---
 layout: docs.njk
-title: "Documentation — oh-my-lisp"
+title: "Documentation"
 description: "Project documentation for oh-my-lisp: accepted architecture, ACP client design, the connection guide, and the changelog."
 eleventyExcludeFromCollections: true
 ---

@@ -3,17 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title }}</title>
+  {%- set pageTitle = title if title == "oh-my-lisp" else title + " — oh-my-lisp" %}
+  <title>{{ pageTitle }}</title>
   <meta name="description" content="{{ description }}">
-  <meta property="og:title" content="{{ title }}">
+  <meta property="og:title" content="{{ pageTitle }}">
   <meta property="og:description" content="{{ description }}">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://oml.sh/">
   <meta name="twitter:card" content="summary">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/style.css">
+  <script>
+    // Applied before first paint so documentation pages never flash the wrong
+    // theme. Docs pages toggle and persist this via docs.js; other pages
+    // ignore the attribute entirely.
+    (function () {
+      var root = document.documentElement;
+      try {
+        var stored = localStorage.getItem("oml-docs-theme");
+        var theme = stored === "light" || stored === "dark"
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        root.setAttribute("data-docs-theme", theme);
+      } catch (err) {
+        root.setAttribute("data-docs-theme", "light");
+      }
+    })();
+  </script>
 </head>
-<body>
+<body{% if bodyClass %} class="{{ bodyClass }}"{% endif %}>
 <nav class="site-nav" aria-label="Primary">
   <a class="nav-brand" href="/"{% if page.url == "/" %} aria-current="page"{% endif %}>oh-my-lisp</a>
   <span class="nav-links">
