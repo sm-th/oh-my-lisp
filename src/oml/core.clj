@@ -4,11 +4,11 @@
   Boots the shared runtime and the plain Lisp REPL — the recovery
   floor that is always available. Optional configuration — including
   any file previously written by `oml.kernel/save-forms` — is
-  evaluated once, via `oml.kernel/evaluate-file`, and decides what
-  runs next; it extends the runtime and never replaces the built-in
-  REPL. Configuration that fails to load or evaluate is reported and
-  the plain REPL starts anyway, so the image stays reachable for
-  repair."
+  evaluated once, via `oml.kernel/evaluate-file`, before the built-in
+  REPL starts. It extends the runtime and never replaces the built-in
+  REPL; a custom client takes over by blocking in its own loop.
+  Configuration that fails to load or evaluate is reported and the
+  plain REPL starts anyway, so the image stays reachable for repair."
   (:require [oml.kernel :as kernel]
             [oml.repl :as repl]))
 
@@ -29,12 +29,14 @@
   With no `init-path`, brings up the plain Lisp REPL directly on
   `in`/`out` — the recovery floor. With `init-path`, evaluates that
   configuration once in the shared runtime namespace, with `*in*` and
-  `*out*` bound to `in`/`out` so the configuration can itself start the
-  REPL, a service, or another client on the same streams; the
-  configuration decides what runs and boot does not start the REPL for
-  it. When the configuration fails to load or evaluate, the failure is
-  reported to `out` and the plain REPL starts anyway, so the image
-  stays reachable for repair — boot never aborts before offering it.
+  `*out*` bound to `in`/`out`, then starts the built-in REPL when
+  evaluation returns. Configuration extends the image and never
+  replaces the built-in REPL; a custom client takes over by blocking
+  in its own loop, which naturally prevents boot from reaching the
+  built-in REPL. When configuration fails to load or evaluate, the
+  failure is reported to `out` before the plain REPL starts, so the
+  image stays reachable for repair — boot never aborts before offering
+  it.
 
   Returns {:exit 0}, or {:exit 0, :init-failure message} when a
   supplied init file failed and the recovery REPL ran. Does not throw
@@ -52,9 +54,9 @@
                        nil
                        (catch Throwable t
                          (report-init-failure init-path t)))]
+         (repl/repl-loop in out)
          (if failure
-           (do (repl/repl-loop in out)
-               {:exit 0 :init-failure failure})
+           {:exit 0 :init-failure failure}
            {:exit 0}))))))
 
 (defn parse-args

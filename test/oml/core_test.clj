@@ -39,34 +39,41 @@
     (is (str/starts-with? out "oml> "))
     (is (str/includes? out "3"))))
 
-(deftest valid-configuration-runs-once-and-decides-not-to-start-anything
-  (let [f (tmp-init-file "ct-decide-nothing"
-                         "(defonce ct-decide-boot-count (atom []))"
-                         "(swap! ct-decide-boot-count conj :boot)"
-                         "(def ct-decide-value 10)")
-        {:keys [result out]} (boot-with "(inc ct-decide-value)\n" (.getPath f))]
+(deftest valid-configuration-runs-once-before-the-built-in-repl
+  (let [f (tmp-init-file "ct-valid"
+                         "(defonce ct-valid-boot-count (atom []))"
+                         "(swap! ct-valid-boot-count conj :boot)"
+                         "(def ct-valid-value 10)")
+        {:keys [result out]} (boot-with "(inc ct-valid-value)\n" (.getPath f))]
     (is (= 0 (:exit result)))
-    (is (= 1 (kernel/eval-string "(count @ct-decide-boot-count)"))
+    (is (= 1 (kernel/eval-string "(count @ct-valid-boot-count)"))
         "configuration is evaluated exactly once per boot")
-    (is (= "" out)
-        "boot never starts the REPL on its own; a configuration that starts
-        nothing leaves the REPL input untouched")))
-
-(deftest valid-configuration-can-start-the-built-in-repl-on-the-boot-streams
-  (let [f (tmp-init-file "ct-decide-repl"
-                         "(defonce ct-repl-boot-count (atom []))"
-                         "(swap! ct-repl-boot-count conj :boot)"
-                         "(def ct-repl-value 10)"
-                         "(require '[oml.repl :as repl])"
-                         "(repl/repl-loop *in* *out*)")
-        {:keys [result out]} (boot-with "(inc ct-repl-value)\n" (.getPath f))]
-    (is (= 0 (:exit result)))
     (is (str/starts-with? out "oml> ")
-        "configuration started the REPL on boot's own input/output streams")
+        "the built-in REPL follows a configuration that returns")
     (is (str/includes? out "11")
-        "configuration state is visible to the REPL it started")
-    (is (= 1 (kernel/eval-string "(count @ct-repl-boot-count)"))
-        "configuration is evaluated exactly once per boot")))
+        "configuration state is visible to the built-in REPL")))
+
+(deftest blocking-configuration-takes-over-until-it-returns
+  (let [client-started (promise)
+        client-release (promise)
+        _ (intern (kernel/ensure-runtime) 'ct-client-started client-started)
+        _ (intern (kernel/ensure-runtime) 'ct-client-release client-release)
+        f (tmp-init-file "ct-blocking-client"
+                         "(deliver ct-client-started true)"
+                         "@ct-client-release")
+        out (StringWriter.)
+        in (LineNumberingPushbackReader. (StringReader. ""))
+        boot-result (future (core/boot in out (.getPath f)))]
+    (try
+      (is (= true (deref client-started 1000 false))
+          "configuration entered its blocking client loop")
+      (is (= "" (str out))
+          "the built-in REPL does not start while configuration is blocking")
+      (finally
+        (deliver client-release true)))
+    (is (= {:exit 0} (deref boot-result 1000 ::timeout)))
+    (is (str/starts-with? (str out) "oml> ")
+        "the built-in REPL starts after configuration returns")))
 
 (deftest failing-configuration-is-reported-and-the-recovery-repl-stays-available
   (let [f (tmp-init-file "ct-bad" "(def ct-never 1\n")

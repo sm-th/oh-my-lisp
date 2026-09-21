@@ -84,15 +84,15 @@ same file format, used to restore anything else saved during a session.
 
 ## Recovery boot
 
-`oml` boots the plain Lisp REPL — the recovery floor — whenever there is no
-configuration to run or that configuration does not take over:
+`oml` boots the plain Lisp REPL — the recovery floor — directly when there is no
+configuration, or after configuration evaluation returns:
 
 - **No configuration.** With no init-file argument, `oml` starts the built-in
   REPL directly.
 - **Valid configuration.** With an init-file argument, `oml` evaluates that file
-  once. The configuration decides what happens next — including starting the
-  REPL itself, or a service, or nothing at all — and boot does not start the
-  REPL on its own for it.
+  once, then starts the built-in REPL. Configuration extends the image and never
+  replaces the REPL. A custom client takes over by blocking in its own loop, which
+  naturally prevents boot from reaching the built-in REPL while that loop runs.
 - **Broken configuration.** If the configuration fails to load or evaluate, `oml`
   reports the failure and its cause, then starts the plain REPL anyway, so the
   image stays reachable for repair rather than aborting.
