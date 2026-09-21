@@ -68,10 +68,11 @@ for what is shipped and what is still accepted-but-not-implemented.
 
 ## Status
 
-Early, and now runnable. The **v0.1.0** release delivers a local ACP v1 client —
-connect, sessions, prompts with streamed updates, permissions, cancellation, and
-capability-gated close — over the official ACP Java SDK, on top of the eval
-surface, explicit persistence, and recovery boot described above. Design first;
+Early, and now runnable. **v0.2.0** adds the living-image kernel — explicit-file
+persistence, recovery boot, and the Lisp-only REPL — on top of the eval surface,
+with the local ACP v1 client (connect, sessions, prompts with streamed updates,
+permissions, cancellation, and capability-gated close) bundled as the first
+layer, shipped in v0.1.0. Design first;
 work happens in issues and pull requests.
 
 ## License
