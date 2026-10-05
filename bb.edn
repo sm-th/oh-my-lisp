@@ -1,0 +1,10 @@
+{:paths ["src"]
+ :tasks
+ {demo {:doc "Run the suspend/resume demo: start | answer <text> | show | boundary"
+        :requires ([oml.demo])
+        :task (apply oml.demo/-main *command-line-args*)}
+  test {:doc "Run the test suite"
+        :extra-paths ["test"]
+        :requires ([clojure.test :as t] [oml.machine-test])
+        :task (let [{:keys [fail error]} (t/run-tests 'oml.machine-test)]
+                (System/exit (if (zero? (+ fail error)) 0 1)))}}}
