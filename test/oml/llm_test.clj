@@ -83,3 +83,16 @@
         (is (true? (:cancelled? result)))
         (is (= "partial" (-> result :message :content))))
       (finally ((:stop! srv))))))
+
+(deftest accumulating-reasoning
+  (let [events (atom [])
+        acc (llm/consume (concat (fake/reasoning-chunks "Hmm, " "two.") (fake/text-chunks "2"))
+                         #(swap! events conj %))]
+    (is (= [{:type :thought-delta :text "Hmm, "} {:type :thought-delta :text "two."}
+            {:type :text-delta :text "2"}]
+           @events))
+    (is (= {:role "assistant" :content "2"} (llm/assistant-message acc))
+        "reasoning stays out of the transcript by default")
+    (with-redefs [llm/send-reasoning? true]
+      (is (= {:role "assistant" :content "2" :reasoning_content "Hmm, two."}
+             (llm/assistant-message acc))))))

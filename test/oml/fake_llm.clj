@@ -13,6 +13,19 @@
   (concat (for [p pieces] {:choices [{:index 0 :delta {:content p}}]})
           [{:choices [{:index 0 :delta {} :finish_reason "stop"}]}]))
 
+(defn reasoning-chunks
+  "Chunks that stream `pieces` of reasoning, alternating the field names
+  gateways use: `reasoning_content`, then `reasoning`."
+  [& pieces]
+  (map-indexed (fn [i p] {:choices [{:index 0 :delta {(if (even? i) :reasoning_content :reasoning) p}}]})
+               pieces))
+
+(defn usage-chunk
+  "The final chunk carrying usage (stream_options.include_usage)."
+  [prompt-tokens completion-tokens]
+  {:choices [] :usage {:prompt_tokens prompt-tokens :completion_tokens completion-tokens
+                       :total_tokens (+ prompt-tokens completion-tokens)}})
+
 (defn tool-call-chunks
   "Chunks for one tool call whose JSON arguments arrive in fragments."
   [id name & arg-fragments]
