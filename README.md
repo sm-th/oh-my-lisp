@@ -9,7 +9,9 @@ step with [pi](https://github.com/earendil-works/pi) (`~/pi/packages`).
 - It speaks the [Agent Client Protocol](https://agentclientprotocol.com) (ACP)
   as an **agent** over stdio, so any ACP client (Toad, Zed, Emacs
   agent-shell) is its UI.
-- Tools: `read`, `write`, `edit`, `bash`.
+- Tools: `read`, `write`, `edit`, `bash`. More (search tools, a
+  permission policy, project context, usage, model switch) are user code in
+  [`examples/`](#recipes).
 - Everything is customisable the way Emacs is: named functions you can
   redefine, documented settings, hook variables, advice, an init file and a
   live REPL into the running agent. See [Customising oml](#customising-oml).
@@ -28,10 +30,12 @@ See [docs/CHAPTERS.md](docs/CHAPTERS.md) for the plan and status.
 | `src/oml/repl.clj` | 4 | nREPL server into the running agent |
 | `src/oml/ext/help.clj` | 4 | `/describe`, `/apropos`, `/eval`, `/reload`, `/settings`, `/tools`, `/commands`, `/hooks` |
 | `src/oml/cancel.clj` | 7 | Cancellation token shared by the HTTP stream, the loop and `bash` |
-| `src/oml/acp.clj` | 8 | ACP agent: JSON-RPC over stdio, one multimethod per method, `session/update` streaming, slash commands |
+| `src/oml/session.clj` | 4 | The current session (`*session*`), its transcript, `say` |
+| `src/oml/acp.clj` | 8 | ACP agent: JSON-RPC over stdio, one multimethod per method, `session/update` streaming, slash commands, `request!` and `request-permission` to the client |
 | `src/oml/print_mode.clj` | - | One prompt, output to stdout, no UI |
 | `test/oml/fake_llm.clj` | - | In-process fake OpenAI server replaying scripted SSE |
-| `examples/init.clj` | 4 | An example init file |
+| `test/oml/acp_client.clj` | - | Scripted ACP client for end-to-end tests (answers the agent's requests) |
+| `examples/init.clj`, `examples/lisp/my/` | 4 | An example init file and recipes (see [Recipes](#recipes)) |
 
 ## Running
 
@@ -104,7 +108,7 @@ multimethod (`defmethod` adds one). Redefine any of them with `defn` in its
 namespace. Settings are vars made with `defsetting`; like Emacs' `defvar`,
 re-loading their namespace keeps the value you set. The ones that exist:
 `oml.llm/base-url`, `api-key`, `model` (defaults from `OPENAI_*`),
-`oml.agent/max-turns`, `enabled-tools` (nil = all), `oml.ext.core/bash-timeout`,
+`send-reasoning?`, `oml.agent/max-turns`, `enabled-tools` (nil = all), `oml.ext.core/bash-timeout`,
 `bash-max-chars`, `read-max-chars`, `read-default-limit`,
 `oml.init/load-project-init?`, `extensions`, `oml.repl/nrepl?`,
 `nrepl-host`, `nrepl-port`.
@@ -119,6 +123,7 @@ re-loading their namespace keeps the value you set. The ones that exist:
 | `oml.agent/before-tool-functions` | `(f call ctx)`, call `{:id :name :args}` | a rewritten call, nil, or the call with `:block "reason"` (the model sees the reason) |
 | `oml.agent/after-tool-functions` | `(f result call ctx)`, result `{:content :error?}` | a replacement result, or nil |
 | `oml.agent/session-start-hook` | `(f {:session-id :cwd})` | ignored |
+| `oml.llm/chunk-functions` | `(f chunk)`, every parsed SSE chunk as it arrives (provider-specific fields included) | ignored |
 
 Add vars (`#'my-fn`), not anonymous functions: a var stays late-bound when
 you redefine the function, and adding it again on `/reload` is a no-op.
@@ -169,6 +174,96 @@ See [`examples/init.clj`](examples/init.clj): it overrides a prompt
 section, adds a tool and a command, blocks `rm -rf` with a hook, logs model
 calls with advice, changes settings and requires a module from the load
 path ([`examples/lisp/my/notes.clj`](examples/lisp/my/notes.clj)).
+
+### Primitives
+
+What the core gives Lisp code, for what an init file could not do on its
+own. Everything else (see [Recipes](#recipes)) is built on these.
+
+**The current session** (`oml.session`). `*session*` is the id of the
+current session: bound during a prompt turn, a slash command (`/eval`
+included), tool calls and hooks. Its root value is the most recently active
+session, so nREPL evaluations work on that one.
+
+```clojure
+(oml.session/session)        ; => {:id "sess_..." :cwd "/project" :cancel <token or nil> ...}
+(oml.session/transcript)     ; => [{:role "user" :content "..."} {:role "assistant" ...} ...]
+(oml.session/append-message! {:role "user" :content "Remember: tabs."})  ; the next request sees it
+(oml.session/set-transcript! compacted)                                 ; replace it (compaction)
+(oml.session/say "Indexing...")  ; agent_message_chunk to the client, from anywhere
+```
+
+The transcript holds OpenAI-format messages without the system message
+(which is rebuilt every request). The loop appends to it in place: each
+assistant message together with its tool results.
+
+**Call a tool as the agent** (`oml.agent/call-tool`). Runs through
+`run-tool-call`, like a model tool call: the client shows a `tool_call`
+card and its `tool_call_update`, the before/after-tool hooks run (and may
+block it). Returns `{:content :error?}`.
+
+```clojure
+(oml.agent/call-tool 'ls {:path "."})          ; a symbol, a tool name or a var
+(oml.agent/call-tool "read" {:path "README.md"} :record? false)
+```
+
+With `:record?` (default: true inside a session when no model turn is
+running, i.e. from a command, `/eval` or nREPL) the call is appended to the
+transcript as the model would have made it, so the model sees it next turn:
+
+```clojure
+{:role "assistant" :content nil
+ :tool_calls [{:id "call_..." :type "function"
+               :function {:name "ls" :arguments "{\"path\":\".\"}"}}]}
+{:role "tool" :tool_call_id "call_..." :content "AGENTS.md\nsrc/"}
+```
+
+**One-shot model call** (`oml.agent/complete`): the configured model, no
+tools, nothing shown to the user; returns the text. Inside a prompt,
+cancelling the prompt cancels it.
+
+```clojure
+(oml.agent/complete "Name this session in three words." :system "Be terse.")
+(oml.agent/complete (oml.session/transcript) :model "small/model")
+```
+
+**Requests to the client** (`oml.acp`). `(request! method params)` sends a
+JSON-RPC request to the ACP client of the current session and blocks until
+it answers; it throws on an error response, when the client goes away, or
+when the prompt is cancelled. `request-permission` is ACP
+`session/request_permission` on top of it; the core has no permission
+policy, it only asks.
+
+```clojure
+(oml.acp/request-permission {:toolCallId id :rawInput args})  ; default options: allow_once,
+;; => {:outcome "selected" :optionId "allow_always" :kind "allow_always"}  ; allow_always, reject_once,
+;;    or {:outcome "cancelled"}                                         ; reject_always
+```
+
+Responses are read by the stdin reader thread, so `request!` refuses to run
+on it (from `session-start-hook`, which runs there); prompts, commands,
+tools, loop hooks and nREPL are fine.
+
+**Reasoning.** `reasoning_content` or `reasoning` deltas are shown as
+`agent_thought_chunk` (loop event `:thought-delta`) and kept out of the
+transcript unless `oml.llm/send-reasoning?` is true. `oml.llm/chunk-functions`
+sees every raw chunk for anything else a provider sends.
+
+### Recipes
+
+Each is a short module in [`examples/lisp/my/`](examples/lisp/my/),
+required by [`examples/init.clj`](examples/init.clj) and run end to end by
+`test/oml/examples_test.clj`:
+
+| Module | What | Built on |
+|---|---|---|
+| `my.context` | `AGENTS.md` (or `CLAUDE.md`) from the session cwd in the system prompt | `system-prompt-functions` |
+| `my.usage` | token usage per session, `/usage` | `after-model-functions`, a command |
+| `my.search` | `ls`, `find`, `grep` tools (`rg` when on PATH, else `grep -rn`), output capped | `^:oml/tool` |
+| `my.search` | `/ls-here`: runs `ls` as the agent, the client shows the card | `call-tool` |
+| `my.model` | `/model` shows the model, `/model <id>` switches | `setq oml.llm/model` |
+| `my.permissions` | ask before `write`, `edit`, `bash`; reject blocks and the model sees why; "always" remembered per tool for the session | `before-tool-functions`, `request-permission` |
+| `my.notes` | a prompt section and `/notes` | |
 
 ### A live REPL into the agent
 
@@ -236,8 +331,9 @@ oml-prompt "List the files here, then create hello.txt containing hi"
 Init files load as in ACP mode, and `oml-prompt "/describe oml.agent/run"`
 runs a command. Text streams as it arrives; each tool call prints as `> name: title`
 followed by `ok:` or `failed:` and the first line of the result. There is no
-permission prompt yet (chapter 7): `bash` and `write` run immediately, so use
-a scratch directory.
+client to ask for permission: without a policy `bash` and `write` run
+immediately, so use a scratch directory (with the `my.permissions` recipe
+they are blocked instead).
 
 ### b) Toad as the ACP client
 
@@ -307,11 +403,13 @@ from `agent-shell-make-agent-config` with a `:client-maker` that calls
 
 `initialize` (protocol version 1, no auth, text prompts only),
 `session/new`, `session/prompt` with `session/update` notifications
-(`agent_message_chunk`, `tool_call`, `tool_call_update`,
-`available_commands_update`) and stop reasons `end_turn`, `cancelled`,
-`max_turn_requests`, and the `session/cancel` notification. A prompt that
-starts with `/name` of a known command runs the command instead of calling
-the model; an unknown `/x` goes to the model as text. Sessions live in memory only. `session/request_permission`,
+(`agent_message_chunk`, `agent_thought_chunk`, `tool_call`,
+`tool_call_update`, `available_commands_update`) and stop reasons
+`end_turn`, `cancelled`, `max_turn_requests`, and the `session/cancel`
+notification. A prompt that starts with `/name` of a known command runs the
+command instead of calling the model; an unknown `/x` goes to the model as
+text. Agent-to-client requests: `session/request_permission` (and any
+other method through `oml.acp/request!`). Sessions live in memory only.
 `session/load` and client-side `fs/*` / `terminal/*` are later chapters.
 
 ## History

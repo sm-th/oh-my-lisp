@@ -14,12 +14,34 @@ on top of it.
 | 4 | Customisation the Lisp way: named functions, discovery by metadata, `init.clj`, live REPL | done |
 | 5 | Sessions: persisting the transcript, resume, fork | planned |
 | 6 | Context: system prompt assembly, compaction | planned |
-| 7 | Control: cancel, steer, follow-up queue, permissions | cancel done (basic) |
+| 7 | Control: cancel, steer, follow-up queue, permissions | cancel, permission primitive done |
 | 8 | UI: ACP agent mode; own TUI later (charm.clj), optional | ACP done (basic) |
 | 9 | Agent with only `eval` in a SCI sandbox | planned |
 | 10 | Self-modification under owner-approved goals and invariants | planned |
 | 11 | Durability: survive crash/sleep and resume | planned |
 | 12 | Presentations: output as typed objects | planned |
+
+## Primitives in the core, the rest in user code
+
+The core only grows primitives: what code in `init.clj` could not do
+because the core does not expose it. These exist now (README,
+"Primitives"): the current session and its transcript (`oml.session`),
+`call-tool`, `say`, `complete`, agent-to-client `request!` and
+`request-permission`, the reasoning stream (`agent_thought_chunk`) and the
+raw chunk hook (`oml.llm/chunk-functions`).
+
+Moved to user code, as recipes in `examples/lisp/my/` with end-to-end
+tests (`test/oml/examples_test.clj`):
+
+- project context (`AGENTS.md` / `CLAUDE.md` in the system prompt; part of chapter 6)
+- token usage per session and `/usage`
+- search tools `ls`, `find`, `grep`
+- model switch `/model`
+- the permission policy (part of chapter 7); the core only asks
+
+Still core, later: session persistence and `session/load` (chapter 5),
+the follow-up and steering queues (chapter 7), and compaction (chapter 6),
+which will use `complete` and `set-transcript!`.
 
 ## 1. Model call (streaming, SSE) - done
 
@@ -78,24 +100,28 @@ Compare with in pi: `coding-agent/src/core/session-manager.ts` (append-only JSON
 ## 6. Context: system prompt assembly, compaction
 
 Build the system prompt from project files (AGENTS.md etc.) and tool list;
-summarise old turns when the context window fills up.
+summarise old turns when the context window fills up. Project files are a
+recipe (`examples/lisp/my/context.clj`); compaction remains, on top of
+`complete` and `oml.session/set-transcript!`.
 
 Compare with in pi: `coding-agent/src/core/system-prompt.ts`, `coding-agent/src/core/compaction/compaction.ts`.
 
 ## 7. Control: cancel, steer, follow-up queue, permissions
 
 Done: `session/cancel` aborts the HTTP stream and kills a running `bash`
-(`src/oml/cancel.clj`). Next: steering messages injected mid-turn, a
-follow-up queue, and ACP `session/request_permission` before `write`, `edit`
-and `bash`.
+(`src/oml/cancel.clj`). `oml.acp/request-permission` asks the client
+(ACP `session/request_permission`); the policy that asks before `write`,
+`edit` and `bash` is user code (`examples/lisp/my/permissions.clj`). Next:
+steering messages injected mid-turn and a follow-up queue.
 
 Compare with in pi: `agent/src/agent.ts` (steering and follow-up queues), `coding-agent/examples/extensions/permission-gate.ts` (permissions as an extension).
 
 ## 8. UI: ACP agent mode; own TUI later
 
 Done (basic): `src/oml/acp.clj`, `initialize`, `session/new`,
-`session/prompt` with `agent_message_chunk` / `tool_call` /
-`tool_call_update`, `session/cancel`. Optional later: a TUI with charm.clj.
+`session/prompt` with `agent_message_chunk` / `agent_thought_chunk` /
+`tool_call` / `tool_call_update`, `session/cancel`, and agent-to-client
+requests (`request!`, `session/request_permission`). Optional later: a TUI with charm.clj.
 
 Compare with in pi: `coding-agent/src/modes/rpc/rpc-mode.ts` (pi's own stdio JSON protocol), `coding-agent/src/modes/interactive/interactive-mode.ts` and `tui/src` (its TUI).
 
