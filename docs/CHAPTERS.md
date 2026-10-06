@@ -1,7 +1,8 @@
 # Chapters
 
-The harness is built one component at a time. Each chapter names the pi code
-to read alongside it (paths relative to `~/pi/packages`). Customisation is
+The harness is built one component at a time. Each chapter names the
+[pi](https://github.com/earendil-works/pi) code to read alongside it (paths
+relative to its `packages/` directory). Customisation is
 the core of the project, so it comes right after the first working loop,
 and every later chapter is built as plain functions that can be redefined
 or wrapped.
@@ -24,8 +25,8 @@ or wrapped.
 ## Primitives in the core, the rest in user code
 
 The core only grows primitives: what code in `init.clj` could not do
-because the core does not expose it. These exist now (README,
-"Primitives"): the current session and its transcript (`oml.session`),
+because the core does not expose it. These exist now
+([Primitives](https://oml.sh/primitives/)): the current session and its transcript (`oml.session`),
 `call-tool`, `say`, `complete`, agent-to-client `request!` and
 `request-permission`, the reasoning stream (`agent_thought_chunk`) and
 `oml.llm/on-chunk`, called with every raw chunk.
@@ -87,7 +88,7 @@ dynamic var, `oml.session/*session*`. Introspection reuses `clojure.repl`
 is a program: `~/.config/oml/init.clj`, then `<project>/.oml/init.clj`,
 with `lisp/` dirs on the classpath; an nREPL server gives a live REPL into
 the running agent; commands are advertised to the ACP client
-(`available_commands_update`). See "Customising oml" in the README.
+(`available_commands_update`). See [Customising](https://oml.sh/customising/).
 
 Compare with in pi: `coding-agent/src/core/extensions/` (loader, runner, types: the registry approach this chapter deliberately avoids), `coding-agent/src/core/slash-commands.ts`.
 
@@ -146,8 +147,7 @@ Compare with in pi: `coding-agent/src/core/extensions/jiti-loader.ts` (hot-loadi
 ## 11. Durability: survive crash/sleep and resume
 
 Commit each step before acting on it so a turn can resume after a crash or a
-laptop sleep. The continuation-interpreter prototype is tagged
-`proto/continuations`.
+laptop sleep.
 
 Compare with in pi: `durable/` (pi-durable: turns and tool calls committed to storage before they are shown, resume after process death).
 
