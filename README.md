@@ -27,8 +27,8 @@ See [docs/CHAPTERS.md](docs/CHAPTERS.md) for the plan and status.
 
 ## Running
 
-Requires [babashka](https://babashka.org) (tested with 1.13.219 and 1.13.220).
-The devenv below provides it.
+Requires [babashka](https://babashka.org) (tested with 1.13.219 and newer).
+The nix dev shell below provides it.
 
 ```sh
 bb acp                 # ACP agent on stdin/stdout (logs go to stderr)
@@ -53,17 +53,17 @@ mode, as a JSON-RPC error in ACP mode), not at startup.
 
 ## How to test it by hand
 
-### Environment: devenv
+### Environment: nix dev shell
 
-[devenv](https://devenv.sh) pins everything the manual flow needs:
-babashka (1.13.220 from `cachix/devenv-nixpkgs/rolling`, locked in
-`devenv.lock`), Python 3.14 + uv, and Toad (`batrachian-toad==0.6.20`,
-installed with uv into `.devenv/state/venv` on first shell entry; Toad is
-not in nixpkgs). Keys go in an optional, gitignored `.env`:
+`flake.nix` provides babashka, Python 3.14, uv and Toad. Toad
+(`batrachian-toad==0.6.20`) is not in nixpkgs; the `toad` wrapper runs that
+pinned version through `uvx` on the nix Python, so the first run downloads it
+from PyPI and later runs use uv's cache. Keys go in an optional, gitignored
+`.env`, loaded on shell entry:
 
 ```sh
 cp .env.example .env   # set OML_MODEL and OPENROUTER_API_KEY
-devenv shell           # or: devenv shell -- oml-test
+nix develop            # or: direnv allow  (.envrc: use flake)
 ```
 
 | Script | Runs |
@@ -73,9 +73,8 @@ devenv shell           # or: devenv shell -- oml-test
 | `oml-acp` | `bin/oml-acp` (ACP agent on stdio) |
 | `oml-toad [dir]` | `toad acp bin/oml-acp <dir or $PWD>` |
 
-With direnv, `direnv allow` loads the same shell via `.envrc`; it is
-optional. Without devenv, install bb and Toad yourself
-(`uv tool install batrachian-toad --python 3.14`) and export the variables.
+Scripts find the repo through `OML_HOME`, which the shell sets to the
+directory you entered it from, so enter it from the repo root.
 
 ### a) Print mode with an OpenRouter key
 
@@ -93,7 +92,7 @@ a scratch directory.
 
 [Toad](https://github.com/batrachianai/toad)'s `toad acp COMMAND PATH` runs
 any command as an ACP agent. It starts the command through a shell in the
-project directory, inheriting the devenv environment (`.env` included):
+project directory, inheriting the dev shell environment (`.env` included):
 
 ```sh
 oml-toad ~/some/project
@@ -110,7 +109,7 @@ Add Agent -> Add Custom Agent opens it):
   "agent_servers": {
     "oml": {
       "type": "custom",
-      "command": "/Users/you/sm-th/oml/bin/oml-acp",
+      "command": "/absolute/path/to/oml/bin/oml-acp",
       "args": [],
       "env": {
         "OML_MODEL": "openai/gpt-4o-mini",

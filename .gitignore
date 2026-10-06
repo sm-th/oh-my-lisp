@@ -1,6 +1,4 @@
 .oml/
 .cpcache/
-.devenv/
-.devenv.flake.nix
 .direnv/
 .env
