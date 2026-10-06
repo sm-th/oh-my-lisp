@@ -3,15 +3,15 @@
 The harness is built one component at a time. Each chapter names the pi code
 to read alongside it (paths relative to `~/pi/packages`). Customisation is
 the core of the project, so it comes right after the first working loop,
-and every later chapter is built as a redefinable, discoverable extension
-on top of it.
+and every later chapter is built as plain functions that can be redefined
+or wrapped.
 
 | # | Chapter | Status |
 |---|---|---|
 | 1 | Model call: streaming Chat Completions, SSE | done |
 | 2 | Agent loop | done |
 | 3 | Tools: read, write, edit, bash | done |
-| 4 | Customisation the Lisp way: named functions, discovery by metadata, `init.clj`, live REPL | done |
+| 4 | Customisation the Lisp way: named functions, tools and commands by namespace, `init.clj`, live REPL | done |
 | 5 | Sessions: persisting the transcript, resume, fork | planned |
 | 6 | Context: system prompt assembly, compaction | planned |
 | 7 | Control: cancel, steer, follow-up queue, permissions | cancel, permission primitive done |
@@ -27,8 +27,8 @@ The core only grows primitives: what code in `init.clj` could not do
 because the core does not expose it. These exist now (README,
 "Primitives"): the current session and its transcript (`oml.session`),
 `call-tool`, `say`, `complete`, agent-to-client `request!` and
-`request-permission`, the reasoning stream (`agent_thought_chunk`) and the
-raw chunk hook (`oml.llm/chunk-functions`).
+`request-permission`, the reasoning stream (`agent_thought_chunk`) and
+`oml.llm/on-chunk`, called with every raw chunk.
 
 Moved to user code, as recipes in `examples/lisp/my/` with end-to-end
 tests (`test/oml/examples_test.clj`):
@@ -63,8 +63,9 @@ Compare with in pi: `agent/src/agent-loop.ts` (the loop), `agent/src/agent.ts` (
 
 ## 3. Tools: read, write, edit, bash - done
 
-`src/oml/tools.clj`. Tools are data (name, description, JSON schema, ACP kind,
-title fn) plus `execute`. `edit` demands a unique exact match; `bash` merges
+`src/oml/tools.clj`. A tool is a documented function of the argument map;
+its name, docstring and destructuring (plus optional types in the attr-map)
+are what the model sees. `edit` demands a unique exact match; `bash` merges
 stdout/stderr, keeps the tail, and kills the process tree on timeout or
 cancel. Errors go back to the model as tool results.
 
@@ -72,20 +73,20 @@ Compare with in pi: `coding-agent/src/core/tools/read.ts`, `write.ts`, `edit.ts`
 
 ## 4. Customisation the Lisp way - done
 
-Everything is a named function the core calls through its var, so
-redefining it changes behaviour on the next call; no registration API. The
-loop is split into documented steps (`src/oml/agent.clj`); each ACP method
-is a multimethod. Tunables are documented settings (`defsetting`, `setq`).
-Hooks are vars holding vectors of functions (`add-hook!`), advice wraps any
-function var (`advise!`). Tools and slash commands are functions with
-metadata (`:oml/tool`, `:oml/command`, docstring as description,
-parameter schema in metadata), discovered from loaded namespaces
-(`src/oml/custom.clj`). The built-in tools and system prompt sections are
-an ordinary extension (`src/oml/ext/core.clj`), introspection commands
-another (`/describe`, `/apropos`, `/eval`, `/reload`, ...). Configuration is
-a program: `~/.config/oml/init.clj`, then `<project>/.oml/init.clj`, with
-`lisp/` dirs on the classpath; an nREPL server gives a live REPL into the
-running agent; commands are advertised to the ACP client
+One mechanism: named functions the core calls through their vars. Change
+behaviour by redefining one (`defn`) or wrapping it (`advise!`, keyed and
+removable, `src/oml/custom.clj`); there are no hook variables and no
+registration API. The loop is split into documented steps
+(`src/oml/agent.clj`); each ACP method is a multimethod. Settings are
+documented vars, set with `setq`. Tools and slash commands are the
+documented public functions of the namespaces in `tool-namespaces` and
+`command-namespaces` (`src/oml/tools.clj`, `src/oml/commands.clj`); a tool's
+JSON schema comes from its argument destructuring. Context comes from one
+dynamic var, `oml.session/*session*`. Introspection reuses `clojure.repl`
+(`/doc`, `/apropos`, `/source`), plus `/eval` and `/reload`. Configuration
+is a program: `~/.config/oml/init.clj`, then `<project>/.oml/init.clj`,
+with `lisp/` dirs on the classpath; an nREPL server gives a live REPL into
+the running agent; commands are advertised to the ACP client
 (`available_commands_update`). See "Customising oml" in the README.
 
 Compare with in pi: `coding-agent/src/core/extensions/` (loader, runner, types: the registry approach this chapter deliberately avoids), `coding-agent/src/core/slash-commands.ts`.
@@ -101,7 +102,7 @@ Compare with in pi: `coding-agent/src/core/session-manager.ts` (append-only JSON
 
 Build the system prompt from project files (AGENTS.md etc.) and tool list;
 summarise old turns when the context window fills up. Project files are a
-recipe (`examples/lisp/my/context.clj`); compaction remains, on top of
+recipe, advice on `system-prompt` (`examples/lisp/my/context.clj`); compaction remains, on top of
 `complete` and `oml.session/set-transcript!`.
 
 Compare with in pi: `coding-agent/src/core/system-prompt.ts`, `coding-agent/src/core/compaction/compaction.ts`.
@@ -111,7 +112,8 @@ Compare with in pi: `coding-agent/src/core/system-prompt.ts`, `coding-agent/src/
 Done: `session/cancel` aborts the HTTP stream and kills a running `bash`
 (`src/oml/cancel.clj`). `oml.acp/request-permission` asks the client
 (ACP `session/request_permission`); the policy that asks before `write`,
-`edit` and `bash` is user code (`examples/lisp/my/permissions.clj`). Next:
+`edit` and `bash` is user code, advice on `execute-tool`
+(`examples/lisp/my/permissions.clj`). Next:
 steering messages injected mid-turn and a follow-up queue.
 
 Compare with in pi: `agent/src/agent.ts` (steering and follow-up queues), `coding-agent/examples/extensions/permission-gate.ts` (permissions as an extension).
