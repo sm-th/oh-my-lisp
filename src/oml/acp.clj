@@ -1,5 +1,5 @@
 (ns oml.acp
-  "Chapter 7 (basic): the Agent Client Protocol, agent side.
+  "Chapter 8 (basic): the Agent Client Protocol, agent side.
 
   ACP is JSON-RPC 2.0, one JSON object per line, over the agent's stdin and
   stdout. The client (Toad, Zed, Emacs agent-shell) is the UI; we are the

@@ -1,18 +1,21 @@
 # Chapters
 
 The harness is built one component at a time. Each chapter names the pi code
-to read alongside it (paths relative to `~/pi/packages`).
+to read alongside it (paths relative to `~/pi/packages`). Customisation is
+the core of the project, so it comes right after the first working loop,
+and every later chapter is built as a redefinable, discoverable extension
+on top of it.
 
 | # | Chapter | Status |
 |---|---|---|
 | 1 | Model call: streaming Chat Completions, SSE | done |
 | 2 | Agent loop | done |
 | 3 | Tools: read, write, edit, bash | done |
-| 4 | Sessions: persisting the transcript, resume, fork | planned |
-| 5 | Context: system prompt assembly, compaction | planned |
-| 6 | Control: cancel, steer, follow-up queue, permissions | cancel done (basic) |
-| 7 | UI: ACP agent mode; own TUI later (charm.clj), optional | ACP done (basic) |
-| 8 | Extensions and hooks | planned |
+| 4 | Customisation the Lisp way: named functions, discovery by metadata, `init.clj`, live REPL | done |
+| 5 | Sessions: persisting the transcript, resume, fork | planned |
+| 6 | Context: system prompt assembly, compaction | planned |
+| 7 | Control: cancel, steer, follow-up queue, permissions | cancel done (basic) |
+| 8 | UI: ACP agent mode; own TUI later (charm.clj), optional | ACP done (basic) |
 | 9 | Agent with only `eval` in a SCI sandbox | planned |
 | 10 | Self-modification under owner-approved goals and invariants | planned |
 | 11 | Durability: survive crash/sleep and resume | planned |
@@ -45,21 +48,41 @@ cancel. Errors go back to the model as tool results.
 
 Compare with in pi: `coding-agent/src/core/tools/read.ts`, `write.ts`, `edit.ts`, `bash.ts`, `truncate.ts`.
 
-## 4. Sessions: persisting transcript, resume, fork
+## 4. Customisation the Lisp way - done
+
+Everything is a named function the core calls through its var, so
+redefining it changes behaviour on the next call; no registration API. The
+loop is split into documented steps (`src/oml/agent.clj`); each ACP method
+is a multimethod. Tunables are documented settings (`defsetting`, `setq`).
+Hooks are vars holding vectors of functions (`add-hook!`), advice wraps any
+function var (`advise!`). Tools and slash commands are functions with
+metadata (`:oml/tool`, `:oml/command`, docstring as description,
+parameter schema in metadata), discovered from loaded namespaces
+(`src/oml/custom.clj`). The built-in tools and system prompt sections are
+an ordinary extension (`src/oml/ext/core.clj`), introspection commands
+another (`/describe`, `/apropos`, `/eval`, `/reload`, ...). Configuration is
+a program: `~/.config/oml/init.clj`, then `<project>/.oml/init.clj`, with
+`lisp/` dirs on the classpath; an nREPL server gives a live REPL into the
+running agent; commands are advertised to the ACP client
+(`available_commands_update`). See "Customising oml" in the README.
+
+Compare with in pi: `coding-agent/src/core/extensions/` (loader, runner, types: the registry approach this chapter deliberately avoids), `coding-agent/src/core/slash-commands.ts`.
+
+## 5. Sessions: persisting transcript, resume, fork
 
 Write the transcript as it grows, reload it (ACP `session/load`), branch from
 any earlier message.
 
 Compare with in pi: `coding-agent/src/core/session-manager.ts` (append-only JSONL tree with forks).
 
-## 5. Context: system prompt assembly, compaction
+## 6. Context: system prompt assembly, compaction
 
 Build the system prompt from project files (AGENTS.md etc.) and tool list;
 summarise old turns when the context window fills up.
 
 Compare with in pi: `coding-agent/src/core/system-prompt.ts`, `coding-agent/src/core/compaction/compaction.ts`.
 
-## 6. Control: cancel, steer, follow-up queue, permissions
+## 7. Control: cancel, steer, follow-up queue, permissions
 
 Done: `session/cancel` aborts the HTTP stream and kills a running `bash`
 (`src/oml/cancel.clj`). Next: steering messages injected mid-turn, a
@@ -68,21 +91,13 @@ and `bash`.
 
 Compare with in pi: `agent/src/agent.ts` (steering and follow-up queues), `coding-agent/examples/extensions/permission-gate.ts` (permissions as an extension).
 
-## 7. UI: ACP agent mode; own TUI later
+## 8. UI: ACP agent mode; own TUI later
 
 Done (basic): `src/oml/acp.clj`, `initialize`, `session/new`,
 `session/prompt` with `agent_message_chunk` / `tool_call` /
 `tool_call_update`, `session/cancel`. Optional later: a TUI with charm.clj.
 
 Compare with in pi: `coding-agent/src/modes/rpc/rpc-mode.ts` (pi's own stdio JSON protocol), `coding-agent/src/modes/interactive/interactive-mode.ts` and `tui/src` (its TUI).
-
-## 8. Extensions and hooks
-
-Genera-style commands: one typed definition used by the human (slash
-command), the agent (tool) and the UI (menu), plus hooks around tool calls
-and turns.
-
-Compare with in pi: `coding-agent/src/core/extensions/` (loader, runner, types), `coding-agent/src/core/slash-commands.ts`.
 
 ## 9. Agent with only `eval` in a SCI sandbox
 
@@ -93,11 +108,12 @@ Compare with in pi: `codemode/` (model-written JavaScript in a QuickJS sandbox w
 
 ## 10. Self-modification under owner-approved goals and invariants
 
-The agent may change its own code (Jiti-style hot reload), but only within
-executable goals and invariants the owner approved; every change is a
-revision that can be rolled back.
+The agent may change its own code by redefining functions (the same
+mechanism as chapter 4), but only within executable goals and invariants the
+owner approved; every change is a revision that can be rolled back, as in
+Jiti and Autolith (both Common Lisp).
 
-Compare with in pi: `coding-agent/src/core/extensions/jiti-loader.ts` (hot-loading TypeScript extensions), `coding-agent/examples/extensions/reload-runtime.ts`.
+Compare with in pi: `coding-agent/src/core/extensions/jiti-loader.ts` (hot-loading TypeScript extensions; unrelated to the Common Lisp project also called Jiti), `coding-agent/examples/extensions/reload-runtime.ts`.
 
 ## 11. Durability: survive crash/sleep and resume
 
