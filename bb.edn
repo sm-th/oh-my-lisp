@@ -3,6 +3,14 @@
  {acp {:doc "Run as an ACP agent on stdio (for Toad, Zed, agent-shell, ...)"
        :requires ([oml.acp])
        :task (oml.acp/-main)}
+  site {:doc "Build the website (https://oml.sh) into site/_site"
+       :extra-paths ["site"]
+       :requires ([build])
+       :task (build/build!)}
+  site:serve {:doc "Build the website, then serve it on http://localhost:8000"
+             :extra-paths ["site"]
+             :requires ([build])
+             :task (do (build/build!) (build/serve! 8000))}
   prompt {:doc "Run one prompt in the current directory: bb prompt \"text\""
           :requires ([oml.print-mode])
           :task (apply oml.print-mode/-main *command-line-args*)}

@@ -1,0 +1,66 @@
+/* oml.sh layout on top of tokens.css; markup follows the design showcase
+   (mast, stamp, .hx headline with the Klein block, running text). */
+
+* { box-sizing: border-box; }
+html { background: var(--bg); color: var(--fg); }
+body { margin: 0 auto; max-width: 48rem; padding: 0 1.5rem; font: 400 17px/1.6 var(--font-text); }
+
+a { color: var(--blue); text-underline-offset: .18em; text-decoration-thickness: .06em; }
+code, pre, kbd { font-family: var(--font-mono); font-variant-ligatures: none; }
+code { font-size: .9em; }
+:not(pre) > code { overflow-wrap: anywhere; }
+td code { overflow-wrap: normal; white-space: nowrap; }
+
+/* masthead */
+.mast { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .5rem 1.5rem;
+        padding: 1.75rem 0 1rem; border-bottom: 2px solid var(--fg); }
+.mast .name { display: inline-flex; align-items: center; gap: .4rem; font: 700 1.35rem/1 var(--font-mono); color: var(--fg); text-decoration: none; }
+.mast .name img { width: 1.4em; height: 1.4em; }
+.mast nav { display: flex; flex-wrap: wrap; gap: .25rem 1.25rem; font: 400 .9rem var(--font-mono); }
+.mast nav a { color: var(--grey); text-decoration: none; }
+.mast nav a:hover, .mast nav a[aria-current] { color: var(--fg); }
+
+/* stamp and headline */
+.stamp { display: flex; flex-wrap: wrap; gap: .4rem 1.6rem; margin-top: 3.5rem; font: 400 .9rem/1 var(--font-mono); color: var(--grey); }
+.stamp b { font-weight: 400; color: var(--blue); }
+.hx { font-weight: 700; letter-spacing: -.025em; font-size: clamp(2.3rem, 7vw, 3.4rem); line-height: 1.04; margin: .9rem 0 2rem; }
+.home .hx { font-size: clamp(2.6rem, 9vw, 4.6rem); line-height: 1; }
+.hx em { font-style: normal; color: var(--blue); }
+.k { display: inline-block; width: .5em; height: .8em; background: var(--klein); vertical-align: -.04em; margin-left: .08em; }
+.k.blink { animation: k-blink 1.06s steps(1) infinite; }
+@keyframes k-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .k.blink { animation: none; } }
+@media (prefers-color-scheme: dark) { .k { background: var(--blue); } }
+
+/* running text */
+.body h2, .body h3 { font-weight: 700; letter-spacing: -.025em; line-height: 1.15; }
+.body h2 { font-size: 1.6rem; margin: 3rem 0 .75rem; }
+.body h3 { font-size: 1.15rem; margin: 2rem 0 .5rem; }
+.body p, .body li { max-width: 42em; }
+.body ul { list-style: none; padding: 0; }
+.body ul li { position: relative; padding-left: 1.5em; margin: .4rem 0; }
+.body ul li::before { content: "→"; position: absolute; left: 0; color: var(--blue); font-family: var(--font-mono); }
+.body ol { padding-left: 1.4em; }
+.body ol li::marker { font-family: var(--font-mono); color: var(--grey); }
+.lead { font-size: 1.2rem; line-height: 1.55; }
+
+pre { background: var(--panel); padding: 1rem 1.2rem; overflow-x: auto; font-size: .82rem; line-height: 1.5; }
+pre code { font-size: 1em; }
+
+table { display: block; overflow-x: auto; border-collapse: collapse; margin: 1.25rem 0; font-size: .92rem; line-height: 1.45; }
+th { text-align: left; font: 400 .8rem var(--font-mono); color: var(--grey); padding: 0 1.2rem .5rem 0; border-bottom: 2px solid var(--fg); vertical-align: bottom; }
+td { padding: .55rem 1.2rem .55rem 0; border-bottom: 1px solid var(--faint); vertical-align: top; }
+
+blockquote { margin: 1.5rem 0; padding: 0 0 0 1.2rem; border-left: 4px solid var(--klein); }
+
+figure { margin: 2rem 0; }
+figure img, video { display: block; width: 100%; height: auto; background: var(--panel); }
+figure img { border: 1px solid var(--faint); }
+figcaption { margin-top: .6rem; font: 400 .85rem/1.4 var(--font-mono); color: var(--grey); }
+
+.cta { display: flex; flex-wrap: wrap; gap: 1rem 1.75rem; align-items: center; margin: 2rem 0; font-family: var(--font-mono); }
+.btn { background: var(--klein); color: var(--on-klein); padding: .7rem 1.1rem; text-decoration: none; }
+
+footer { display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; margin: 5rem 0 0; padding: 1rem 0 2.5rem; border-top: 2px solid var(--faint);
+         font: 400 .85rem var(--font-mono); color: var(--grey); }
+footer a { color: var(--grey); }

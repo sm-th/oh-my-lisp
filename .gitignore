@@ -3,3 +3,4 @@
 .direnv/
 .env
 notes/
+site/_site/
