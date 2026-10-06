@@ -1,33 +1,37 @@
 (ns my.permissions
-  "A permission policy as user code: before write, edit and bash, ask the
-  user through the client (session/request_permission). A rejection blocks
-  the call and the model reads why; \"always\" answers are remembered per
-  tool for the session."
+  "A permission policy as user code: advice on execute-tool asks the user
+  (session/request_permission) before write, edit and bash. The client
+  already shows the call. A rejection blocks it and the model reads why;
+  \"always\" answers are remembered per tool for the session."
   (:require [oml.acp :as acp]
             [oml.agent :as agent]
-            [oml.custom :refer [add-hook! defsetting]]))
+            [oml.custom :refer [advise!]]
+            [oml.session :as session]))
 
-(defsetting ask-tools
+(def ask-tools
   "Tools that need the user's permission."
   #{"write" "edit" "bash"})
 
 (defonce ^{:doc "session id -> tool name -> :allow or :reject"} remembered (atom {}))
 
-(defn ask-permission
-  "A before-tool hook: ask before the tools in ask-tools."
-  [{:keys [id name args block] :as call} {:keys [session-id]}]
-  (when (and (not block) (contains? ask-tools name))
-    (case (get-in @remembered [session-id name])
+(defn- decide
+  "Nil to run the call, or why it is blocked."
+  [{:keys [id name args]}]
+  (let [k [(:id (session/session)) name]]
+    (case (get-in @remembered k)
       :allow nil
-      :reject (assoc call :block (str "the user always rejects " name))
-      (let [{:keys [outcome kind]} (acp/request-permission {:toolCallId id :rawInput args})
-            remember! #(swap! remembered assoc-in [session-id name] %)]
+      :reject (str "the user always rejects " name)
+      (let [{:keys [outcome kind]} (acp/request-permission {:toolCallId id :rawInput args})]
         (case kind
           "allow_once" nil
-          "allow_always" (do (remember! :allow) nil)
-          "reject_always" (do (remember! :reject) (assoc call :block "the user rejected it"))
-          (assoc call :block (if (= "cancelled" outcome)
-                               "the prompt was cancelled before the user answered"
-                               "the user rejected it")))))))
+          "allow_always" (do (swap! remembered assoc-in k :allow) nil)
+          "reject_always" (do (swap! remembered assoc-in k :reject) "the user rejected it")
+          (if (= "cancelled" outcome)
+            "the prompt was cancelled before the user answered"
+            "the user rejected it"))))))
 
-(add-hook! #'agent/before-tool-functions #'ask-permission)
+(advise! #'agent/execute-tool ::ask
+         (fn [execute-tool {:keys [name] :as call}]
+           (if-let [reason (and (contains? ask-tools name) (decide call))]
+             {:content (str "Blocked: " reason) :error? true}
+             (execute-tool call))))

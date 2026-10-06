@@ -6,45 +6,45 @@
   lines, ending with `data: [DONE]`. Each JSON chunk carries a `delta` with a
   bit of text, reasoning and/or fragments of tool calls; we fold the chunks
   into one assistant message and report progress through an `on-event`
-  callback. chunk-functions see every raw chunk.
+  callback. `on-chunk` sees every raw chunk.
 
   Compare with pi: packages/ai/src/api/openai-completions.ts"
   (:require [babashka.http-client :as http]
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [oml.cancel :as cancel]
-            [oml.custom :refer [defsetting]]))
+            [oml.cancel :as cancel]))
 
 ;; ---------------------------------------------------------------------------
 ;; Settings (defaults from the standard OPENAI_* variables)
 
-(defsetting base-url
+(def base-url
   "OpenAI-compatible base URL; /chat/completions is appended."
   (or (not-empty (System/getenv "OPENAI_BASE_URL")) "https://api.openai.com/v1"))
 
-(defsetting ^:oml/secret api-key
-  "Bearer token for the model endpoint, or nil. Marked :oml/secret, so
-  /describe and /settings do not show it."
+(def ^:secret api-key
+  "Bearer token for the model endpoint, or nil. Marked ^:secret, so /doc
+  and /settings do not show it."
   (not-empty (System/getenv "OPENAI_API_KEY")))
 
-(defsetting model
+(def model
   "Model id, e.g. \"gpt-4o-mini\" (or \"openai/gpt-4o-mini\" on OpenRouter).
   Required when prompting."
   (not-empty (System/getenv "OPENAI_MODEL")))
 
-(defsetting send-reasoning?
+(def send-reasoning?
   "Send the model's reasoning back to it: when true, an assistant message
   keeps what was streamed as reasoning in :reasoning_content. Off by
   default; many endpoints reject or ignore the field."
   false)
 
-(defonce ^{:oml/hook true
-           :doc "Functions (f chunk) run on every parsed SSE chunk (a JSON map, keys
-  as keywords) as it arrives, before it is folded into the message. Use
-  them to read provider-specific fields. Return values are ignored; an
-  error is logged and does not stop the stream."}
-  chunk-functions [])
+(defn on-chunk
+  "Called with every parsed SSE chunk (a JSON map, keys as keywords) as it
+  arrives, before it is folded into the message. Does nothing; redefine or
+  advise! it to read provider-specific fields. Its value is ignored; an
+  error is logged and does not stop the stream."
+  [_chunk]
+  nil)
 
 (defn config
   "The endpoint configuration for stream-chat, read from the settings at
@@ -121,23 +121,22 @@
                   {:id id :type "function"
                    :function {:name name :arguments arguments}})))))
 
-(defn- run-chunk-hooks [chunk]
-  (doseq [f chunk-functions]
-    (try (f chunk)
-         (catch Exception e
-           (binding [*out* *err*] (println "[oml] error in chunk-functions:" (ex-message e)))))))
+(defn- observe [chunk]
+  (try (on-chunk chunk)
+       (catch Exception e
+         (binding [*out* *err*] (println "[oml] error in on-chunk:" (ex-message e))))))
 
 (defn consume
   "Fold a seq of chunks, emitting :text-delta and :thought-delta (reasoning)
   as they arrive and one :tool-call per completed call at the end. Every
-  chunk goes through chunk-functions first. Returns the accumulator. The
+  chunk goes to on-chunk first. Returns the accumulator. The
   running accumulator is also kept in the volatile `progress`, so a caller
   whose stream is cut off still has the partial message."
   ([chunks on-event] (consume chunks on-event (volatile! nil)))
   ([chunks on-event progress]
    (vreset! progress empty-acc)
    (doseq [chunk chunks]
-     (run-chunk-hooks chunk)
+     (observe chunk)
      (when-let [t (reasoning-delta chunk)]
        (on-event {:type :thought-delta :text t}))
      (when-let [t (-> chunk :choices first :delta :content)]

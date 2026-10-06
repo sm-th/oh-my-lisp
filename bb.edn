@@ -9,11 +9,11 @@
   test {:doc "Run the test suite"
         :extra-paths ["test"]
         :requires ([clojure.test :as t]
-                   [oml.llm-test] [oml.agent-test] [oml.ext-core-test]
+                   [oml.llm-test] [oml.agent-test] [oml.tools-test]
                    [oml.custom-test] [oml.acp-test] [oml.primitives-test]
                    [oml.examples-test])
         :task (let [{:keys [fail error]} (t/run-tests 'oml.llm-test 'oml.agent-test
-                                                      'oml.ext-core-test 'oml.custom-test
+                                                      'oml.tools-test 'oml.custom-test
                                                       'oml.acp-test 'oml.primitives-test
                                                       'oml.examples-test)]
                 (System/exit (if (zero? (+ fail error)) 0 1)))}}}

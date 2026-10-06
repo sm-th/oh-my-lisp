@@ -7,19 +7,19 @@
   to stderr; stdout stays reserved for ACP."
   (:require [babashka.fs :as fs]
             [babashka.nrepl.server :as nrepl]
-            [oml.custom :refer [defsetting]]
-            [oml.init :as init]))
+            [oml.init :as init]
+            [oml.session :refer [log]]))
 
-(defsetting nrepl?
+(def nrepl?
   "Start an nREPL server when the ACP agent starts."
   true)
 
-(defsetting nrepl-host
+(def nrepl-host
   "Address the nREPL server binds to. Anyone who can connect can run code
   as you, so keep it on loopback."
   "127.0.0.1")
 
-(defsetting nrepl-port
+(def nrepl-port
   "Port of the nREPL server; 0 picks a free one."
   0)
 
@@ -42,5 +42,5 @@
           (reset! server (assoc s :port port))
           (fs/create-dirs (fs/parent f))
           (spit f (str port))
-          (init/log (str "nREPL on " nrepl-host ":" port " (port written to " f ")"))
+          (log (str "nREPL on " nrepl-host ":" port " (port written to " f ")"))
           port))))

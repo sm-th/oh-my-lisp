@@ -47,7 +47,7 @@
       (let [[sid ups] (new-session! agent dir)
             names (set (map :name (:availableCommands (last ups))))]
         (is (= "" (message-text ups)) "no init error")
-        (is (every? names ["usage" "model" "ls-here"]))
+        (is (every? names ["usage" "model" "ls-here" "doc"]))
         (testing "search tools; project context"
           (prompt! agent sid "look around")
           (let [[r1 & _ :as rs] (requests)
@@ -57,6 +57,8 @@
             (is (= "AGENTS.md\nnotes.txt\nsub/" ls))
             (is (= "notes.txt\nsub/a.txt" find))
             (is (str/includes? grep "notes.txt:1:buy milk"))))
+        (testing "settings from the init file"
+          (is (str/includes? (message-text (first (prompt! agent sid "/doc oml.agent/max-turns"))) "Value: `50`")))
         (testing "usage"
           (is (= "4 model calls, 40 prompt tokens, 4 completion tokens"
                  (message-text (first (prompt! agent sid "/usage"))))))
@@ -73,7 +75,8 @@
             (is (= {:toolCallId "w1" :rawInput {:path "out.txt" :content "x"}} (get-in req [:params :toolCall])))
             (is (= "tool_call" (:sessionUpdate (first (filter :toolCallId (updates notes)))))
                 "the card is shown before the question")
-            (is (= "Blocked: the user rejected it" (:content (last (tool-messages r)))))
+            (is (= "ERROR: Blocked: the user rejected it" (:content (last (tool-messages r))))
+                "the policy blocked it, and the redefined tool-result-message marked it")
             (is (not (fs/exists? (fs/path dir "out.txt"))))))
         (testing "allow_always is remembered for the session"
           (reset! replies ["allow_always"])
@@ -86,7 +89,7 @@
         (testing "/ls-here calls the ls tool as the agent"
           (let [[ups _] (prompt! agent sid "/ls-here")
                 [call update] ups]
-            (is (= ["tool_call" "tool_call_update"] (map :sessionUpdate ups)))
+            (is (= ["tool_call" "tool_call_update" "available_commands_update"] (map :sessionUpdate ups)))
             (is (= {:title "List ." :kind "read" :rawInput {:path "."}} (select-keys call [:title :kind :rawInput])))
             (is (str/includes? (get-in update [:content 0 :content :text]) "notes.txt"))
             (prompt! agent sid "what is here?")

@@ -16,29 +16,23 @@
 (defn- on-event [{:keys [type] :as e}]
   (case type
     :text-delta (do (print (:text e)) (flush))
-    :thought-delta nil
     :tool-start (println (str "\n> " (:name e) ": " (:title e)))
     :tool-end   (println (str (if (:error? e) "  failed: " "  ok: ") (first-line (:content e))))
     nil))
 
 (defn -main [& args]
-  (let [text (str/join " " args)
-        cwd (System/getProperty "user.dir")]
+  (let [text (str/join " " args)]
     (when (str/blank? text)
       (binding [*out* *err*] (println "usage: bb prompt <text>"))
       (System/exit 2))
-    (init/startup!)
-    (init/load-project-init! cwd)
     (try
-      (session/with-session (session/create! {:cwd cwd :on-event on-event})
-        (let [{:keys [command input]} (agent/parse-prompt text)]
-          (if command
-            (println (agent/run-command (session/ctx) command input))
-            (let [_ (session/append-message! {:role "user" :content text})
-                  result (agent/run (session/ctx) (:transcript (session/session)))]
-              (println)
-              (when (not= :end-turn (:stop-reason result))
-                (binding [*out* *err*] (println "[stopped:" (name (:stop-reason result)) "]")))))))
+      (let [errors (init/startup!)]
+        (session/with-session (session/create! {:cwd (System/getProperty "user.dir") :on-event on-event})
+          (init/session-started! errors)
+          (let [{:keys [stop-reason]} (agent/prompt text)]
+            (println)
+            (when (not= :end-turn stop-reason)
+              (binding [*out* *err*] (println "[stopped:" (name stop-reason) "]"))))))
       (catch clojure.lang.ExceptionInfo e
         (binding [*out* *err*] (println "error:" (ex-message e)))
         (System/exit 1)))))

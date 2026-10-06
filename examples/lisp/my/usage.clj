@@ -1,27 +1,17 @@
 (ns my.usage
-  "Token usage as user code: an after-model hook adds up the usage the
-  endpoint reports, per session; /usage shows it."
+  "Token usage as user code: advice on call-model adds up the usage the
+  endpoint reports, per session. /usage (my.commands) shows it."
   (:require [oml.agent :as agent]
-            [oml.custom :refer [add-hook!]]))
+            [oml.custom :refer [advise!]]
+            [oml.session :as session]))
 
-(defonce ^{:doc "session id -> {:calls :prompt_tokens :completion_tokens}"} usage (atom {}))
+(defonce ^{:doc "session id -> {:calls :prompt_tokens :completion_tokens}"} totals (atom {}))
 
-(defn count-usage
-  "After each model call, add its usage to the session's total."
-  [response _request {:keys [session-id]}]
-  (when-let [u (:usage response)]
-    (swap! usage update session-id
-           (partial merge-with +)
-           {:calls 1 :prompt_tokens (:prompt_tokens u 0) :completion_tokens (:completion_tokens u 0)}))
-  nil)
-
-(add-hook! #'agent/after-model-functions #'count-usage)
-
-(defn usage-command
-  "Show the tokens used in this session."
-  {:oml/command true :oml/name "usage"}
-  [{:keys [session-id]} _input]
-  (if-let [{:keys [calls prompt_tokens completion_tokens]} (get @usage session-id)]
-    (str calls " model calls, " prompt_tokens " prompt tokens, "
-         completion_tokens " completion tokens")
-    "No model calls yet."))
+(advise! #'agent/call-model ::count
+         (fn [call-model request]
+           (let [{:keys [usage] :as response} (call-model request)]
+             (when usage
+               (swap! totals update (:id (session/session)) (partial merge-with +)
+                      {:calls 1 :prompt_tokens (:prompt_tokens usage 0)
+                       :completion_tokens (:completion_tokens usage 0)}))
+             response)))

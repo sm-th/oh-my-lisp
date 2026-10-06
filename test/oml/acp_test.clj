@@ -76,55 +76,57 @@
     (try
       (let [[sid ups] (new-session! agent dir)
             cmds (:availableCommands (last ups))
-            by-name (into {} (map (juxt :name identity)) cmds)]
-        (testing "available_commands_update advertises the discovered commands"
-          (is (every? by-name ["describe" "apropos" "eval" "reload" "settings" "tools" "commands" "hooks"]))
-          (is (= {:name "describe"
-                  :description "Describe a function, setting, hook, tool or command (like C-h f / C-h v)."
+            by-name (into {} (map (juxt :name identity)) cmds)
+            say #(message-text (first (prompt! agent sid %)))]
+        (testing "available_commands_update advertises the commands"
+          (is (= #{"doc" "apropos" "source" "eval" "reload" "settings" "tools" "commands"} (set (keys by-name))))
+          (is (= {:name "doc"
+                  :description "Show a var's documentation (clojure.repl/doc), its value if it is not a function, its advice and where it is defined."
                   :input {:hint "symbol, e.g. oml.agent/max-turns or run-tool-call"}}
-                 (by-name "describe")))
-          (is (every? #(string? (:description %)) cmds)))
-        (testing "/describe shows doc, current value and source of a setting"
-          (let [[ups resp] (prompt! agent sid "/describe oml.agent/max-turns")
+                 (by-name "doc"))))
+        (testing "/doc shows doc, current value and source location of a setting"
+          (let [[ups resp] (prompt! agent sid "/doc oml.agent/max-turns")
                 text (message-text ups)]
             (is (= "end_turn" (get-in resp [:result :stopReason])))
-            (is (str/includes? text "oml.agent/max-turns  (setting, variable)"))
-            (is (str/includes? text "Value: `30`"))
+            (is (str/starts-with? text "oml.agent/max-turns\n"))
             (is (str/includes? text "Model calls allowed"))
+            (is (str/includes? text "Value: `30`"))
             (is (re-find #"agent\.clj:\d+" text))))
-        (testing "secret settings are not shown"
-          (let [text (message-text (first (prompt! agent sid "/describe oml.llm/api-key")))]
+        (testing "secret values are not shown"
+          (let [text (say "/doc oml.llm/api-key")]
             (is (str/includes? text "Value: `<hidden>`"))
-            (is (not (str/includes? text "test-key")))))
-        (testing "/describe finds unqualified names and tools"
-          (let [text (message-text (first (prompt! agent sid "/describe run-tool-call")))]
-            (is (str/includes? text "oml.agent/run-tool-call"))
-            (is (str/includes? text "[ctx {:keys [id function]}]")))
-          (is (str/includes? (message-text (first (prompt! agent sid "/describe bash")))
-                             "tool \"bash\"")))
-        (testing "/apropos"
-          (let [text (message-text (first (prompt! agent sid "/apropos tool-functions")))]
-            (is (str/includes? text "oml.agent/before-tool-functions` (hook"))
-            (is (str/includes? text "oml.agent/after-tool-functions"))))
+            (is (not (str/includes? text "test-key"))))
+          (is (not (str/includes? (say "/settings") "test-key")))
+          (is (str/includes? (say "/settings") "`oml.agent/max-turns` = `30`")))
+        (testing "/doc finds unqualified names: steps and tools"
+          (is (str/includes? (say "/doc run-tool-call") "([{:keys [id function]}])"))
+          (is (str/starts-with? (say "/doc bash") "oml.tools/bash")))
+        (testing "/apropos and /source"
+          (let [text (say "/apropos tool")]
+            (is (str/includes? text "`oml.agent/run-tool-call`"))
+            (is (str/includes? text "`oml.agent/call-tool`"))
+            (is (str/includes? text "`oml.agent/execute-tool`"))
+            (is (not (str/includes? text "clojure.core"))))
+          (is (str/starts-with? (say "/source oml.agent/stop-reason") "(defn stop-reason")))
+        (testing "/tools and /commands list what is there"
+          (is (str/includes? (say "/tools") "- `bash` (oml.tools/bash) Run a bash command"))
+          (is (str/includes? (say "/commands") "- `/eval` Evaluate Clojure forms")))
         (testing "/eval evaluates in the agent process"
-          (is (= "3" (message-text (first (prompt! agent sid "/eval (+ 1 2)")))))
-          (is (= "hi\n:done" (message-text (first (prompt! agent sid "/eval (println \"hi\") :done")))))
-          (is (str/includes? (message-text (first (prompt! agent sid "/eval (/ 1 0)")))
-                             "Error in /eval: Divide by zero")))
+          (is (= "3" (say "/eval (+ 1 2)")))
+          (is (= "hi\n:done" (say "/eval (println \"hi\") :done")))
+          (is (str/includes? (say "/eval (/ 1 0)") "Error in /eval: Divide by zero")))
         (is (empty? @(:requests srv)) "commands never call the model")
         (testing "an unknown /x is text for the model"
           (prompt! agent sid "/nope do it")
           (is (= "/nope do it" (:content (last (:messages (first @(:requests srv))))))))
         (testing "a defn from user code changes the next turn"
-          (prompt! agent sid (str "/eval (in-ns 'oml.ext.core)"
-                                  " (defn identity-section [_] \"You are a pirate.\")"))
+          (say "/eval (in-ns 'oml.agent) (defn system-prompt [] \"You are a pirate.\")")
           (prompt! agent sid "hello")
-          (is (str/starts-with? (system-prompt (second @(:requests srv))) "You are a pirate.")))
-        (testing "/eval defining a command re-advertises the commands"
-          (let [[ups _] (prompt! agent sid (str "/eval (in-ns 'user)"
-                                                " (defn ^:oml/command shout \"Shout it.\" [_ s] (str s \"!\"))"))]
+          (is (= "You are a pirate." (system-prompt (second @(:requests srv))))))
+        (testing "a function defined in a command namespace is a command, advertised after /eval"
+          (let [[ups _] (prompt! agent sid "/eval (in-ns 'oml.commands) (defn shout \"Shout it.\" [s] (str s \"!\"))")]
             (is (some #(= "shout" (:name %)) (:availableCommands (last ups)))))
-          (is (= "hey!" (message-text (first (prompt! agent sid "/shout hey"))))))
+          (is (= "hey!" (say "/shout hey"))))
         (testing "/reload re-reads init files and re-advertises"
           (let [[ups resp] (prompt! agent sid "/reload")]
             (is (str/starts-with? (message-text ups) "Reloaded "))
@@ -132,27 +134,28 @@
             (is (= "end_turn" (get-in resp [:result :stopReason]))))))
       (finally (stop-agent agent) ((:stop! srv))))))
 
-(deftest init-files-tools-and-hooks
+(deftest init-files-load-path-and-tool-namespaces
   (let [config (temp-dir)
         dir (temp-dir)
         _ (fs/create-dirs (fs/path config "oml" "lisp" "my"))
         _ (spit (str (fs/path config "oml" "lisp" "my" "ext.clj"))
                 (pr-str '(ns my.ext)
                         '(defn shout "Upper-case the given text."
-                           {:oml/tool true :oml/params {:text [:string "Text to shout"]}}
-                           [_ {:keys [text]}]
+                           {:params {:text [:string "Text to shout"]}}
+                           [{:keys [text]}]
                            (clojure.string/upper-case text))))
         _ (spit (str (fs/path config "oml" "init.clj"))
-                (pr-str '(require '[oml.custom :refer [setq add-hook!]] 'my.ext)
-                        '(setq oml.llm/model "init/model")))
+                (pr-str '(require '[oml.custom :refer [setq]])
+                        '(setq oml.llm/model "init/model"
+                               oml.agent/tool-namespaces '[oml.tools my.ext])))
         _ (fs/create-dirs (fs/path dir ".oml"))
         _ (spit (str (fs/path dir ".oml" "init.clj"))
                 (pr-str '(ns project.init (:require [clojure.string :as str] [oml.custom :as c]))
-                        '(defn no-rm-rf [call _ctx]
-                           (when (and (= "bash" (:name call))
-                                      (str/includes? (get-in call [:args :command] "") "rm -rf"))
-                             (assoc call :block "rm -rf is not allowed here")))
-                        '(c/add-hook! #'oml.agent/before-tool-functions #'no-rm-rf)))
+                        '(c/advise! #'oml.agent/execute-tool :project/no-rm-rf
+                                    (fn [execute {:keys [name args] :as call}]
+                                      (if (and (= "bash" name) (str/includes? (:command args "") "rm -rf"))
+                                        {:content "Blocked: rm -rf is not allowed here" :error? true}
+                                        (execute call))))))
         srv (fake/start! [(fake/tool-call-chunks "c1" "shout" "{\"text\":\"hi\"}")
                           (fake/tool-call-chunks "c2" "bash" "{\"command\":\"rm -rf /tmp/nothing-here\"}")
                           (fake/text-chunks "done")
@@ -165,23 +168,22 @@
             tool-msgs (filter #(= "tool" (:role %)) (:messages r3))]
         (is (= "end_turn" (get-in resp [:result :stopReason])))
         (is (= "init/model" (:model r1)) "the user init file changed a setting")
-        (is (some #(= "shout" (get-in % [:function :name])) (:tools r1))
-            "a tool from a module on the load path is offered")
         (is (= {:type "object" :properties {:text {:type "string" :description "Text to shout"}}
                 :required ["text"]}
-               (:parameters (:function (first (filter #(= "shout" (get-in % [:function :name])) (:tools r1)))))))
-        (is (= "HI" (:content (first tool-msgs))) "the discovered tool runs")
+               (:parameters (:function (first (filter #(= "shout" (get-in % [:function :name])) (:tools r1))))))
+            "a tool from a namespace on the load path is offered")
+        (is (= "HI" (:content (first tool-msgs))) "and runs")
         (is (= "Blocked: rm -rf is not allowed here" (:content (second tool-msgs)))
-            "the project hook blocked the call and the model sees why")
+            "the project init file's advice blocked the call and the model sees why")
         (is (= ["completed" "failed"] (keep :status (filter #(= "tool_call_update" (:sessionUpdate %)) ups))))
         (is (some? r2))
+        (testing "/doc shows the advice"
+          (is (str/includes? (message-text (first (prompt! agent sid "/doc oml.agent/execute-tool")))
+                             "Advised: [:project/no-rm-rf]")))
         (testing "ns-unmap removes a tool"
           (prompt! agent sid "/eval (ns-unmap 'my.ext 'shout)")
           (prompt! agent sid "again")
-          (is (not-any? #(= "shout" (get-in % [:function :name])) (:tools (last @(:requests srv))))))
-        (testing "/describe of a hook shows its functions"
-          (is (str/includes? (message-text (first (prompt! agent sid "/describe before-tool-functions")))
-                             "#'project.init/no-rm-rf"))))
+          (is (not-any? #(= "shout" (get-in % [:function :name])) (:tools (last @(:requests srv)))))))
       (finally (stop-agent agent) ((:stop! srv))))))
 
 (deftest init-errors-are-reported
@@ -215,39 +217,13 @@
             _ (is (fs/exists? port-file))
             port (parse-long (str/trim (slurp (str port-file))))
             _ (prompt! agent sid "one")
-            values (nrepl-eval port (str "(in-ns 'oml.ext.core)"
-                                         " (defn identity-section [_] \"Redefined over nREPL.\")"
-                                         " (identity-section nil)"))
+            values (nrepl-eval port (str "(in-ns 'oml.agent)"
+                                         " (defn system-prompt [] \"Redefined over nREPL.\")"
+                                         " (system-prompt)"))
             _ (prompt! agent sid "two")
             [r1 r2] @(:requests srv)]
         (is (= "\"Redefined over nREPL.\"" (last values)))
         (is (str/starts-with? (system-prompt r1) "You are oml"))
         (is (str/starts-with? (system-prompt r2) "Redefined over nREPL.")
             "the next prompt uses the function redefined over nREPL"))
-      (finally (stop-agent agent) ((:stop! srv))))))
-
-(deftest the-example-init-file-loads
-  (let [config (temp-dir)
-        dir (temp-dir)
-        _ (fs/copy-tree "examples/lisp" (fs/path config "oml" "lisp"))
-        _ (fs/copy "examples/init.clj" (fs/path config "oml" "init.clj"))
-        _ (spit (str dir "/NOTES.md") "remember the milk")
-        srv (fake/start! [(fake/tool-call-chunks "c1" "bash" "{\"command\":\"rm -rf build\"}")
-                          (fake/text-chunks "ok")])
-        agent (start-agent (:url srv) {:config-dir config})]
-    (try
-      (let [[sid ups] (new-session! agent dir)
-            names (set (map :name (:availableCommands (last ups))))
-            [ups2 _] (prompt! agent sid "clean")
-            [r1 r2] @(:requests srv)]
-        (is (= "" (message-text ups)) "no init error")
-        (is (every? names ["today" "notes"]))
-        (is (some #(= "word-count" (get-in % [:function :name])) (:tools r1)))
-        (is (str/includes? (system-prompt r1) "Run the tests after every change."))
-        (is (str/includes? (system-prompt r1) "read it before starting"))
-        (is (str/starts-with? (:content (last (:messages r2))) "Blocked: rm -rf is not allowed"))
-        (is (= "failed" (:status (first (filter #(= "tool_call_update" (:sessionUpdate %)) ups2)))))
-        (is (= "remember the milk" (message-text (first (prompt! agent sid "/notes")))))
-        (is (str/includes? (message-text (first (prompt! agent sid "/describe oml.agent/max-turns")))
-                           "Value: `50`")))
       (finally (stop-agent agent) ((:stop! srv))))))

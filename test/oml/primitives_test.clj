@@ -1,7 +1,7 @@
 (ns oml.primitives-test
   "The primitives the core gives Lisp code, end to end over ACP: the
   current session and its transcript, call-tool, say, complete, request!
-  and request-permission, and the reasoning stream."
+  and request-permission, and the reasoning stream with on-chunk."
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [oml.acp-client :as c :refer [temp-dir start-agent stop-agent new-session!
@@ -34,11 +34,11 @@
           (is (= (pr-str sid) (eval-text agent sid "oml.session/*session*")))
           (is (= (pr-str [sid dir]) (eval-text agent sid "((juxt :id :cwd) (oml.session/session))"))))
         (testing "inside a command"
-          (eval-text agent sid (str "(defn ^:oml/command sid \"Session id.\" [_ _]"
+          (eval-text agent sid (str "(in-ns 'oml.commands) (defn sid \"Session id.\" [_]"
                                     " (:id (oml.session/session)))"))
           (is (= sid (message-text (first (prompt! agent sid "/sid"))))))
         (testing "inside a model turn (a tool)"
-          (eval-text agent sid (str "(defn ^:oml/tool whoami \"Session id.\" [_ _]"
+          (eval-text agent sid (str "(in-ns 'oml.tools) (defn whoami \"Session id.\" [_]"
                                     " oml.session/*session*)"))
           (prompt! agent sid "who am I?")
           (is (= sid (:content (last (:messages (second @(:requests srv)))))))
@@ -61,12 +61,13 @@
     (with-agent [srv [(fake/text-chunks "seen")] agent {}]
       (let [[sid _] (new-session! agent dir)
             _ (eval-text agent sid (str "(defonce seen (atom []))"
-                                        "(defn no-secrets [call _]"
-                                        "  (swap! seen conj (:name call))"
-                                        "  (when (= \"secret.txt\" (get-in call [:args :path]))"
-                                        "    (assoc call :block \"no secrets\")))"
-                                        "(oml.custom/add-hook! #'oml.agent/before-tool-functions #'no-secrets)"))
-            [ups _] (prompt! agent sid "/eval (:content (oml.agent/call-tool 'read {:path \"notes.txt\"}))")
+                                        "(oml.custom/advise! #'oml.agent/execute-tool :no-secrets"
+                                        "  (fn [execute call]"
+                                        "    (swap! seen conj (:name call))"
+                                        "    (if (= \"secret.txt\" (get-in call [:args :path]))"
+                                        "      {:content \"Blocked: no secrets\" :error? true}"
+                                        "      (execute call))))"))
+            [ups _] (prompt! agent sid "/eval (:content (oml.agent/call-tool 'read {:path \"notes.txt\"} :record? true))")
             [call update] (filter #(#{"tool_call" "tool_call_update"} (:sessionUpdate %)) ups)]
         (testing "the client shows the call"
           (is (= {:sessionUpdate "tool_call" :title "Read notes.txt" :kind "read" :status "in_progress"
@@ -75,9 +76,9 @@
           (is (= (:toolCallId call) (:toolCallId update)))
           (is (= "completed" (:status update)))
           (is (str/includes? (message-text ups) "hello from notes") "the result is returned"))
-        (testing "before-tool hooks run"
+        (testing "advice on execute-tool applies"
           (is (= "[\"read\"]" (eval-text agent sid "@seen")))
-          (let [[ups _] (prompt! agent sid "/eval (oml.agent/call-tool \"read\" {:path \"secret.txt\"} :record? false)")]
+          (let [[ups _] (prompt! agent sid "/eval (oml.agent/call-tool \"read\" {:path \"secret.txt\"})")]
             (is (str/includes? (message-text ups) "{:content \"Blocked: no secrets\", :error? true}"))
             (is (= "failed" (:status (last (filter :status ups)))))))
         (testing "the recorded pair is a valid OpenAI transcript"
@@ -86,7 +87,7 @@
                 [assistant tool user] (rest msgs)
                 tc (first (:tool_calls assistant))]
             (is (= ["system" "assistant" "tool" "user"] (map :role msgs))
-                "the call with :record? false is not in the transcript")
+                "a call without :record? true is not in the transcript")
             (is (nil? (:content assistant)))
             (is (= {:type "function" :function {:name "read" :arguments "{\"path\":\"notes.txt\"}"}}
                    (dissoc tc :id)))
@@ -100,8 +101,9 @@
       (testing "say streams agent_message_chunk"
         (let [[ups _] (prompt! agent sid "/eval (oml.session/say \"Hello \" \"there\") :ok")]
           (is (= [{:sessionUpdate "agent_message_chunk" :content {:type "text" :text "Hello there"}}
-                  {:sessionUpdate "agent_message_chunk" :content {:type "text" :text ":ok"}}]
-                 ups))))
+                  {:sessionUpdate "agent_message_chunk" :content {:type "text" :text ":ok"}}
+                  "available_commands_update"]
+                 (update (vec ups) 2 :sessionUpdate)))))
       (testing "complete returns the text and sends no tools"
         (let [[ups _] (prompt! agent sid "/eval (oml.agent/complete \"Summarise\" :system \"Be brief.\")")
               req (first @(:requests srv))]
@@ -151,9 +153,9 @@
           (is (= "cancelled" (get-in resp [:result :stopReason])))))
       (testing "request! on the reader thread is refused, not deadlocked"
         (eval-text agent sid (str "(def start-error (atom nil))"
-                                  "(defn ask-at-start [_]"
-                                  "  (try (oml.acp/request! \"x/y\" {}) (catch Exception e (reset! start-error (ex-message e)))))"
-                                  "(oml.custom/add-hook! #'oml.agent/session-start-hook #'ask-at-start)"))
+                                  "(in-ns 'oml.session)"
+                                  "(defn on-session-start []"
+                                  "  (try (oml.acp/request! \"x/y\" {}) (catch Exception e (reset! user/start-error (ex-message e)))))"))
         (let [[sid2 _] [(get-in (second (c/request! agent 950 "session/new" {:cwd (temp-dir) :mcpServers []}))
                                 [:result :sessionId])
                         (c/collect-until-commands agent)]]
@@ -175,12 +177,12 @@
                agent {}]
     (let [[sid _] (new-session! agent (temp-dir))
           _ (eval-text agent sid (str "(defonce providers (atom []))"
-                                      "(defn note-provider [chunk] (some->> (:provider chunk) (swap! providers conj)))"
-                                      "(oml.custom/add-hook! #'oml.llm/chunk-functions #'note-provider)"))
+                                      "(in-ns 'oml.llm)"
+                                      "(defn on-chunk [chunk] (some->> (:provider chunk) (swap! user/providers conj)))"))
           [ups _] (prompt! agent sid "think")
           _ (prompt! agent sid "again")]
       (is (= [["agent_thought_chunk" "Let me "] ["agent_thought_chunk" "think."] ["agent_message_chunk" "Answer."]]
              (map (juxt :sessionUpdate (comp :text :content)) ups)))
       (is (= {:role "assistant" :content "Answer."} (nth (:messages (second @(:requests srv))) 2))
           "reasoning is not sent back by default")
-      (is (= "[\"fake-gateway\"]" (eval-text agent sid "@providers")) "the chunk hook sees raw chunks"))))
+      (is (= "[\"fake-gateway\"]" (eval-text agent sid "@providers")) "on-chunk sees raw chunks"))))
