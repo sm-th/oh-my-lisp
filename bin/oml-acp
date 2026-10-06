@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Start oml as an ACP agent on stdio. ACP clients launch this command.
+# Works from any directory; the session cwd comes from session/new.
+exec bb --config "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/bb.edn" acp "$@"

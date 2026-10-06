@@ -1,7 +1,15 @@
 {:paths ["src"]
  :tasks
- {test {:doc "Run the test suite"
+ {acp {:doc "Run as an ACP agent on stdio (for Toad, Zed, agent-shell, ...)"
+       :requires ([oml.acp])
+       :task (oml.acp/-main)}
+  prompt {:doc "Run one prompt in the current directory: bb prompt \"text\""
+          :requires ([oml.print-mode])
+          :task (apply oml.print-mode/-main *command-line-args*)}
+  test {:doc "Run the test suite"
         :extra-paths ["test"]
-        :requires ([clojure.test :as t] [oml.llm-test] [oml.tools-test] [oml.agent-test])
-        :task (let [{:keys [fail error]} (t/run-tests 'oml.llm-test 'oml.tools-test 'oml.agent-test)]
+        :requires ([clojure.test :as t]
+                   [oml.llm-test] [oml.agent-test] [oml.tools-test] [oml.acp-test])
+        :task (let [{:keys [fail error]} (t/run-tests 'oml.llm-test 'oml.agent-test
+                                                      'oml.tools-test 'oml.acp-test)]
                 (System/exit (if (zero? (+ fail error)) 0 1)))}}}
