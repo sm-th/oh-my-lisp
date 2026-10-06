@@ -1,93 +1,14 @@
 (ns oml.acp-test
-  "End-to-end: run `bb acp` as a subprocess, talk JSON-RPC over its stdio, and
-  point it at the in-process fake model server. Each agent gets its own
-  XDG_CONFIG_HOME and XDG_STATE_HOME, so the user's init files are not loaded."
+  "End-to-end: run `bb acp` as a subprocess with the scripted client in
+  oml.acp-client, against the in-process fake model server."
   (:require [babashka.fs :as fs]
-            [babashka.process :as p]
-            [bencode.core :as bencode]
-            [cheshire.core :as json]
-            [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
-            [oml.fake-llm :as fake])
-  (:import [java.util.concurrent LinkedBlockingQueue TimeUnit]))
-
-(defn- temp-dir [] (str (fs/create-temp-dir)))
-
-(defn- start-agent
-  "Start `bb acp` against the fake server at `base-url`. `config-dir` is
-  used as XDG_CONFIG_HOME (default: a fresh empty dir)."
-  ([base-url] (start-agent base-url {}))
-  ([base-url {:keys [config-dir]}]
-   (let [state-dir (temp-dir)
-         proc (p/process ["bb" "acp"]
-                         {:dir (System/getProperty "user.dir")
-                          :extra-env {"OPENAI_BASE_URL" base-url
-                                      "OPENAI_MODEL" "fake/model"
-                                      "OPENAI_API_KEY" "test-key"
-                                      "XDG_CONFIG_HOME" (or config-dir (temp-dir))
-                                      "XDG_STATE_HOME" state-dir}
-                          :err :inherit})
-         inbox (LinkedBlockingQueue.)
-         w (io/writer (:in proc))]
-     (future (doseq [line (line-seq (io/reader (:out proc)))]
-               (.put inbox (json/parse-string line true))))
-     {:proc proc :inbox inbox :state-dir state-dir
-      :send! (fn [msg] (locking w (.write w (str (json/generate-string (assoc msg :jsonrpc "2.0")) "\n")) (.flush w)))})))
-
-(defn- stop-agent [{:keys [proc]}]
-  (.close ^java.io.OutputStream (:in proc))
-  (when (= ::timeout (deref proc 5000 ::timeout)) (p/destroy-tree proc)))
-
-(defn- next-msg [{:keys [inbox]}]
-  (or (.poll ^LinkedBlockingQueue inbox 10 TimeUnit/SECONDS)
-      (throw (ex-info "timed out waiting for the agent" {}))))
-
-(defn- collect-until-response
-  "Read messages until the response to `id`. Returns [notifications response]."
-  [agent id]
-  (loop [notes []]
-    (let [m (next-msg agent)]
-      (if (and (= id (:id m)) (not (:method m)))
-        [notes m]
-        (recur (conj notes m))))))
-
-(defn- request! [agent id method params]
-  ((:send! agent) {:id id :method method :params params})
-  (collect-until-response agent id))
-
-(defn- updates [notes] (map #(get-in % [:params :update]) notes))
-
-(defn- collect-until-commands
-  "Read session updates up to and including available_commands_update."
-  [agent]
-  (loop [ups []]
-    (let [u (get-in (next-msg agent) [:params :update])
-          ups (conj ups u)]
-      (if (= "available_commands_update" (:sessionUpdate u)) ups (recur ups)))))
-
-(defn- new-session!
-  "initialize + session/new in `dir`. Returns [session-id updates-after-new]."
-  [agent dir]
-  (request! agent 1 "initialize" {:protocolVersion 1 :clientCapabilities {}})
-  (let [[_ resp] (request! agent 2 "session/new" {:cwd dir :mcpServers []})]
-    [(get-in resp [:result :sessionId]) (collect-until-commands agent)]))
-
-(def ^:private ids (atom 100))
-
-(defn- prompt!
-  "Send a text prompt. Returns [updates response]."
-  [agent sid text]
-  (let [[notes resp] (request! agent (swap! ids inc) "session/prompt"
-                               {:sessionId sid :prompt [{:type "text" :text text}]})]
-    [(updates notes) resp]))
-
-(defn- message-text
-  "All agent_message_chunk text in `ups`."
-  [ups]
-  (apply str (keep #(when (= "agent_message_chunk" (:sessionUpdate %)) (get-in % [:content :text])) ups)))
-
-(defn- system-prompt [request] (:content (first (:messages request))))
+            [oml.acp-client :refer [temp-dir start-agent stop-agent next-msg
+                                    collect-until-response request! updates
+                                    collect-until-commands new-session! prompt!
+                                    message-text system-prompt nrepl-eval]]
+            [oml.fake-llm :as fake]))
 
 ;; ---------------------------------------------------------------------------
 
@@ -283,21 +204,6 @@
         (is (= "end_turn" (get-in resp [:result :stopReason])))
         (is (= "still here" (message-text ups2)) "the agent keeps working"))
       (finally (stop-agent agent) ((:stop! srv))))))
-
-;; A tiny nREPL client over bencode.
-
-(defn- nrepl-eval [port code]
-  (with-open [sock (java.net.Socket. "127.0.0.1" (int port))]
-    (let [out (.getOutputStream sock)
-          in (java.io.PushbackInputStream. (.getInputStream sock))
-          s #(if (bytes? %) (String. ^bytes %) %)]
-      (bencode/write-bencode out {"op" "eval" "code" code "id" "1"})
-      (loop [values []]
-        (let [m (update-vals (bencode/read-bencode in) s)
-              values (cond-> values (get m "value") (conj (get m "value")))]
-          (if (some #{"done"} (map s (get m "status")))
-            values
-            (recur values)))))))
 
 (deftest nrepl-into-the-running-agent
   (let [dir (temp-dir)

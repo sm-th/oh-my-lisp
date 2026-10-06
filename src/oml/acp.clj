@@ -8,11 +8,15 @@
   Implemented: initialize, session/new, session/prompt (streaming
   session/update notifications), session/cancel, slash commands
   (available_commands_update; a prompt starting with /name runs the command).
-  Not yet: session/request_permission, session/load.
+  Agent to client: `request!` sends any request and waits for the answer;
+  `request-permission` is session/request_permission on top of it. The
+  core imposes no permission policy. Not yet: session/load, the client's
+  fs/* and terminal/* methods.
 
   Each method is a `handle` multimethod; `after-response` runs after the
   response is sent. Add a method with defmethod, change one by redefining
-  it. render-event turns loop events into session updates.
+  it. render-event turns loop events into session updates. Sessions are
+  kept in oml.session.
 
   Spec: https://agentclientprotocol.com/protocol/overview
   Compare with pi: packages/coding-agent/src/modes/rpc/ (pi's own JSON RPC mode)"
@@ -23,7 +27,8 @@
             [oml.cancel :as cancel]
             [oml.custom :as custom]
             [oml.init :as init]
-            [oml.repl :as repl]))
+            [oml.repl :as repl]
+            [oml.session :as session]))
 
 (def protocol-version 1)
 
@@ -65,6 +70,7 @@
   [{:keys [cwd]} {:keys [type] :as e}]
   (case type
     :text-delta {:sessionUpdate "agent_message_chunk" :content (text-block (:text e))}
+    :thought-delta {:sessionUpdate "agent_thought_chunk" :content (text-block (:text e))}
     :tool-start (let [path (get-in e [:args :path])]
                   (cond-> {:sessionUpdate "tool_call"
                            :toolCallId (:id e)
@@ -100,9 +106,9 @@
 
 (defn advertise-commands!
   "Send the discovered commands to the client (available_commands_update)."
-  [{:keys [sessions] :as state} session-id]
+  [state session-id]
   (let [infos (mapv custom/command-info (custom/commands))]
-    (swap! sessions assoc-in [session-id :commands] infos)
+    (swap! session/sessions assoc-in [session-id :commands] infos)
     (send-update! state session-id {:sessionUpdate "available_commands_update"
                                     :availableCommands infos})))
 
@@ -110,27 +116,89 @@
   "Run command var `v` for a prompt and stream its output. Then advertises
   the commands again if the command asked for it (ctx :advertise-commands!)
   or changed them."
-  [{:keys [sessions] :as state} session-id {:keys [cwd]} v input]
+  [state session-id v input]
   (let [advertise? (atom false)
-        ctx {:cwd cwd :session-id session-id
-             :advertise-commands! #(reset! advertise? true)}
+        ctx (assoc (session/ctx) :advertise-commands! #(reset! advertise? true))
         output (agent/run-command ctx v input)]
     (when-not (str/blank? output) (send-text! state session-id output))
     (when (or @advertise?
               (not= (mapv custom/command-info (custom/commands))
-                    (get-in @sessions [session-id :commands])))
+                    (:commands (session/session session-id))))
       (advertise-commands! state session-id))
     {:stopReason "end_turn"}))
 
 (defn agent-turn
-  "Send `text` to the model and run the loop, streaming its events."
-  [{:keys [sessions] :as state} session-id {:keys [cwd messages]} text token]
-  (let [ctx {:cwd cwd :cancel token :session-id session-id
-             :on-event (fn [e] (when-let [u (render-event {:cwd cwd} e)]
-                                 (send-update! state session-id u)))}
-        result (agent/run ctx (conj messages {:role "user" :content text}))]
-    (swap! sessions update session-id assoc :messages (:messages result))
-    {:stopReason (stop-reasons (:stop-reason result))}))
+  "Append `text` to the session transcript as a user message and run the
+  loop on it, streaming its events."
+  [session-id text]
+  (let [{:keys [transcript]} (session/session session-id)]
+    (swap! transcript conj {:role "user" :content text})
+    {:stopReason (stop-reasons (:stop-reason (agent/run (session/ctx) transcript)))}))
+
+;; ---------------------------------------------------------------------------
+;; Requests to the client
+
+(defn request!
+  "Send the JSON-RPC request `method` with `params` to the ACP client of the
+  current session and block until it answers. Returns the result; throws
+  ex-info on an error response ({:code :data}), when the client goes away
+  ({:closed true}) or when the running prompt is cancelled
+  ({:cancelled true}). Options: :client (default: the current session's
+  connection), :cancel (default: the current prompt's token).
+
+  Responses are read by the stdin reader thread, so this must not be called
+  on it: it works from prompts, commands, tools, hooks run by the loop and
+  nREPL, but not from session-start-hook (it throws there)."
+  [method params & {:keys [client cancel]}]
+  (let [s (session/session)
+        {:keys [send! requests next-id reader closed?] :as client} (or client (:client s))
+        cancel (or cancel (:cancel s))]
+    (when-not client (throw (ex-info "No ACP client" {})))
+    (when (identical? (Thread/currentThread) @reader)
+      (throw (ex-info (str "request! on the ACP reader thread would never get its answer: " method) {})))
+    (let [id (swap! next-id inc)
+          p (promise)]
+      (swap! requests assoc id p)
+      (when @closed? (deliver p ::closed))
+      (let [unregister (cancel/on-cancel cancel #(deliver p ::cancelled))]
+        (try
+          (send! {:id id :method method :params params})
+          (let [r @p]
+            (cond (= ::closed r)    (throw (ex-info (str "ACP client closed before answering " method) {:closed true}))
+                  (= ::cancelled r) (throw (ex-info (str "Cancelled while waiting for " method) {:cancelled true}))
+                  (:error r)        (throw (ex-info (str method " failed: " (get-in r [:error :message]))
+                                                    (assoc (:error r) :method method)))
+                  :else             (:result r)))
+          (finally (unregister) (swap! requests dissoc id)))))))
+
+(def permission-options
+  "The default options of request-permission (ACP PermissionOption maps)."
+  [{:optionId "allow_once" :name "Allow once" :kind "allow_once"}
+   {:optionId "allow_always" :name "Always allow" :kind "allow_always"}
+   {:optionId "reject_once" :name "Reject" :kind "reject_once"}
+   {:optionId "reject_always" :name "Always reject" :kind "reject_always"}])
+
+(defn request-permission
+  "Ask the user of the current session about a tool call
+  (session/request_permission). `tool-call` is an ACP ToolCallUpdate:
+  {:toolCallId ...} plus optional :title :kind :rawInput etc. `options`
+  are PermissionOption maps {:optionId :name :kind}, kind one of
+  allow_once, allow_always, reject_once, reject_always (default
+  permission-options).
+
+  Returns the ACP outcome: {:outcome \"selected\" :optionId id :kind kind}
+  (:kind added from `options`) or {:outcome \"cancelled\"}, also when the
+  prompt is cancelled while waiting. No policy here: the caller decides."
+  ([tool-call] (request-permission tool-call permission-options))
+  ([tool-call options]
+   (let [sid (or (:id (session/session)) (throw (ex-info "No current session" {})))
+         outcome (try (:outcome (request! "session/request_permission"
+                                          {:sessionId sid :toolCall tool-call :options options}))
+                      (catch clojure.lang.ExceptionInfo e
+                        (if (:cancelled (ex-data e)) {:outcome "cancelled"} (throw e))))]
+     (cond-> outcome
+       (= "selected" (:outcome outcome))
+       (assoc :kind (some #(when (= (:optionId outcome) (:optionId %)) (:kind %)) options))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Methods
@@ -156,23 +224,26 @@
    :authMethods []
    :agentInfo {:name "oml" :title "oml" :version "0.1.0"}})
 
-(defmethod handle "session/new" [{:keys [sessions]} _ {:keys [cwd]}]
+(defmethod handle "session/new" [state _ {:keys [cwd]}]
   (when (str/blank? cwd) (throw (ex-info "cwd is required" {:code -32602})))
   (let [id (str "sess_" (random-uuid))]
-    (swap! sessions assoc id {:cwd cwd :messages [] :cancel nil})
+    (session/create! {:id id :cwd cwd :client state
+                      :on-event (fn [e] (when-let [u (render-event {:cwd cwd} e)]
+                                          (send-update! state id u)))})
     {:sessionId id}))
 
 (defmethod after-response "session/new" [{:keys [init-errors] :as state} _ {:keys [cwd]} {:keys [sessionId]}]
   ;; The client learns the session id from the response, so session updates
   ;; can only follow it.
-  (let [errors (into (vec init-errors) (init/load-project-init! cwd))]
-    (doseq [e errors] (send-text! state sessionId (str "Warning: " e "\n")))
-    (custom/run-hooks #'agent/session-start-hook {:session-id sessionId :cwd cwd})
-    (advertise-commands! state sessionId)))
+  (session/with-session sessionId
+    (let [errors (into (vec init-errors) (init/load-project-init! cwd))]
+      (doseq [e errors] (send-text! state sessionId (str "Warning: " e "\n")))
+      (custom/run-hooks #'agent/session-start-hook {:session-id sessionId :cwd cwd})
+      (advertise-commands! state sessionId))))
 
-(defmethod handle "session/prompt" [{:keys [sessions] :as state} _ {:keys [sessionId] :as params}]
+(defmethod handle "session/prompt" [state _ {:keys [sessionId] :as params}]
   (let [token (cancel/token)
-        [old _] (swap-vals! sessions
+        [old _] (swap-vals! session/sessions
                             (fn [s] (if (and (contains? s sessionId) (nil? (get-in s [sessionId :cancel])))
                                       (assoc-in s [sessionId :cancel] token)
                                       s)))
@@ -180,19 +251,21 @@
     (cond (nil? session) (throw (ex-info (str "Unknown session: " sessionId) {:code -32602}))
           (:cancel session) (throw (ex-info "A prompt is already running in this session" {:code -32602})))
     (try
-      (let [text (prompt->text (:prompt params))
-            {:keys [command input]} (agent/parse-prompt text)]
-        (if command
-          (command-turn state sessionId session command input)
-          (agent-turn state sessionId session text token)))
+      (session/with-session sessionId
+        (let [text (prompt->text (:prompt params))
+              {:keys [command input]} (agent/parse-prompt text)]
+          (cond-> (if command
+                    (command-turn state sessionId command input)
+                    (agent-turn sessionId text))
+            (cancel/cancelled? token) (assoc :stopReason "cancelled"))))
       (catch Exception e
         ;; A cancelled turn may surface as an exception (e.g. a closed socket).
         (if (cancel/cancelled? token) {:stopReason "cancelled"} (throw e)))
       (finally
-        (swap! sessions assoc-in [sessionId :cancel] nil)))))
+        (swap! session/sessions assoc-in [sessionId :cancel] nil)))))
 
-(defmethod handle "session/cancel" [{:keys [sessions]} _ {:keys [sessionId]}]
-  (some-> (get-in @sessions [sessionId :cancel]) cancel/cancel!)
+(defmethod handle "session/cancel" [_ _ {:keys [sessionId]}]
+  (some-> (:cancel (session/session sessionId)) cancel/cancel!)
   nil)
 
 ;; ---------------------------------------------------------------------------
@@ -214,9 +287,15 @@
        (catch Exception e
          (when-not (= -32601 (:code (ex-data e))) (log "error in" method ":" (ex-message e))))))
 
+(defn- deliver-response
+  "Hand a response from the client to the request! waiting for it."
+  [{:keys [requests]} {:keys [id] :as msg}]
+  (some-> (get @requests id) (deliver msg)))
+
 (defn handle-line
   "Handle one incoming line. Prompts run on their own thread so that
-  session/cancel can be read while a turn is in flight."
+  session/cancel, and responses to request!, can be read while a turn is
+  in flight."
   [{:keys [send!] :as state} line]
   (when-not (str/blank? line)
     (let [msg (try (json/parse-string line true) (catch Exception _ ::invalid))]
@@ -228,20 +307,28 @@
           (swap! (:pending state) conj (future (respond state msg)))
           (respond state msg))
         (:method msg) (notify state msg)
-        :else nil))))   ; a response to a request we never send
+        (and (contains? msg :id) (or (contains? msg :result) (contains? msg :error)))
+        (deliver-response state msg)
+        :else nil))))
 
 (defn serve
-  "Serve ACP on the given streams until `in` closes. Then cancel running
-  turns (the client is gone) and give them a moment to answer.
-  `init-errors` are reported to every new session."
+  "Serve ACP on the given streams until `in` closes. Then fail pending
+  request!s, cancel running turns (the client is gone) and give them a
+  moment to answer. `init-errors` are reported to every new session."
   [in out {:keys [init-errors]}]
-  (let [state {:sessions (atom {})
-               :pending (atom [])
+  (let [state {:pending (atom [])          ; futures of running prompts
+               :requests (atom {})         ; id -> promise of request!
+               :next-id (atom 0)
+               :closed? (atom false)
+               :reader (atom (Thread/currentThread))
                :send! (writer-fn out)
                :init-errors init-errors}]
     (doseq [line (line-seq (io/reader in :encoding "UTF-8"))]
       (handle-line state line))
-    (doseq [{t :cancel} (vals @(:sessions state))] (some-> t cancel/cancel!))
+    (reset! (:closed? state) true)
+    (doseq [p (vals @(:requests state))] (deliver p ::closed))
+    (doseq [s (vals @session/sessions) :when (identical? state (:client s))]
+      (some-> (:cancel s) cancel/cancel!))
     (doseq [f @(:pending state)] (deref f 5000 nil))))
 
 (defn -main [& _]

@@ -2,7 +2,7 @@
   "Introspection commands, like Emacs' describe-function, apropos and M-:.
 
   These are ordinary ^:oml/command functions of [ctx input]: `input` is the
-  text after the command name, ctx is {:cwd :session-id
+  text after the command name, ctx is {:cwd :session-id :cancel :on-event
   :advertise-commands!}. A command prints or returns its output, which the
   client shows as an agent message.
 

@@ -15,7 +15,12 @@
   oml.ext.core.
 
   The loop knows nothing about ACP. It reports progress through the
-  :on-event fn of its context.
+  :on-event fn of its context, and appends to the transcript it is given
+  (in a session, the session's; see oml.session).
+
+  For Lisp code: call-tool runs a tool as the model would (hooks, UI,
+  optionally recorded in the transcript); complete is a one-shot model
+  call without tools.
 
   Compare with pi: packages/agent/src/agent-loop.ts"
   (:require [babashka.fs :as fs]
@@ -23,7 +28,8 @@
             [clojure.string :as str]
             [oml.cancel :as cancel]
             [oml.custom :as custom :refer [defsetting]]
-            [oml.llm :as llm]))
+            [oml.llm :as llm]
+            [oml.session :as session]))
 
 ;; ---------------------------------------------------------------------------
 ;; Settings and hooks
@@ -106,9 +112,10 @@
      :tools (mapv custom/tool-spec (collect-tools ctx))}))
 
 (defn call-model
-  "Send `request` to the model. Returns {:message :cancelled?}."
+  "Send `request` to the model. Returns {:message :cancelled? :usage}.
+  A :model in the request overrides the oml.llm/model setting."
   [ctx request]
-  (llm/stream-chat (llm/config)
+  (llm/stream-chat (cond-> (llm/config) (:model request) (assoc :model (:model request)))
                    (assoc request :on-event (:on-event ctx (fn [_])) :cancel (:cancel ctx))))
 
 (defn model-turn
@@ -141,29 +148,32 @@
       {:content (or (ex-message e) (str e)) :error? true})))
 
 (defn run-tool-call
-  "Run one OpenAI-format tool call: before-tool-functions (which may rewrite
-  or block it), the tool, after-tool-functions. Emits :tool-start and
-  :tool-end. Returns {:content :error?}."
+  "Run one OpenAI-format tool call: emit :tool-start, run
+  before-tool-functions (which may rewrite or block it), the tool,
+  after-tool-functions, emit :tool-end. :tool-start comes first so that a
+  hook asking the user (request-permission) refers to a call the UI already
+  shows. Returns {:content :error?}."
   [ctx {:keys [id function]}]
   (let [emit   (:on-event ctx (fn [_]))
         parsed (try (parse-arguments (:arguments function))
                     (catch Exception e {::error (or (ex-message e) (str e))}))
         call   {:id id :name (:name function) :args (if (::error parsed) {} parsed)}
+        shown  (find-tool ctx (:name call))
+        _      (emit {:type :tool-start :id id :name (:name call) :args (:args call)
+                      :kind (if shown (custom/tool-kind shown) "other")
+                      :title (if shown (custom/tool-title shown (:args call)) (:name call))})
         call   (try (custom/run-hook-filter #'before-tool-functions call ctx)
                     (catch Exception e (assoc call :block (str "before-tool hook failed: " (ex-message e)))))
-        tool   (find-tool ctx (:name call))]
-    (emit {:type :tool-start :id id :name (:name call) :args (:args call)
-           :kind (if tool (custom/tool-kind tool) "other")
-           :title (if tool (custom/tool-title tool (:args call)) (:name call))})
-    (let [result (cond (:block call)    {:content (str "Blocked: " (:block call)) :error? true}
-                       (::error parsed) {:content (::error parsed) :error? true}
-                       (nil? tool)      {:content (str "Unknown tool: " (:name call)) :error? true}
-                       :else            (execute-tool ctx tool (:args call)))
-          result (try (custom/run-hook-filter #'after-tool-functions result call ctx)
-                      (catch Exception e {:content (str "after-tool hook failed: " (ex-message e))
-                                          :error? true}))]
-      (emit (assoc result :type :tool-end :id id))
-      result)))
+        tool   (find-tool ctx (:name call))
+        result (cond (:block call)    {:content (str "Blocked: " (:block call)) :error? true}
+                     (::error parsed) {:content (::error parsed) :error? true}
+                     (nil? tool)      {:content (str "Unknown tool: " (:name call)) :error? true}
+                     :else            (execute-tool ctx tool (:args call)))
+        result (try (custom/run-hook-filter #'after-tool-functions result call ctx)
+                    (catch Exception e {:content (str "after-tool hook failed: " (ex-message e))
+                                        :error? true}))]
+    (emit (assoc result :type :tool-end :id id))
+    result))
 
 (defn tool-result-message
   "The transcript message carrying `result` back to the model."
@@ -178,37 +188,111 @@
         (empty? (:tool_calls (:message response)))                     :end-turn
         (>= turn max-turns)                                             :max-turns))
 
+(def ^:dynamic *in-loop*
+  "True while `run` runs (in its thread): tools and hooks are part of a
+  model turn."
+  false)
+
 (defn run
-  "Run the loop on `messages` (the transcript so far, ending with the new
-  user message, without a system message) until stop-reason says stop.
+  "Run the loop on `transcript` until stop-reason says stop. `transcript` is
+  the messages so far, ending with the new user message, without a system
+  message: a vector, or an atom holding one (a session transcript), which
+  the loop then appends to in place. Each assistant message is appended
+  together with its tool results, so code appending messages meanwhile
+  never splits a tool_calls message from its tool messages.
 
   ctx: {:cwd :cancel :on-event :session-id}; tools and hooks receive it.
-  :on-event receives {:type :text-delta|:tool-start|:tool-end ...}.
+  :on-event receives {:type :text-delta|:thought-delta|:tool-start|:tool-end ...}.
 
   Returns {:messages <transcript with everything appended>
            :stop-reason :end-turn | :cancelled | :max-turns}."
-  [ctx messages]
-  (loop [messages (vec messages)
-         turn 1]
-    (if (cancel/cancelled? (:cancel ctx))
-      {:messages messages :stop-reason :cancelled}
-      (let [{:keys [message] :as response} (model-turn ctx messages)
-            messages (cond-> messages
-                       (and message (or (seq (:content message)) (seq (:tool_calls message))))
-                       (conj message))
-            ;; Every tool call must get a tool message, even when cancelled,
-            ;; or the next request is rejected by the API.
-            messages (reduce (fn [messages call]
-                               (conj messages
-                                     (tool-result-message
-                                      call
-                                      (if (cancel/cancelled? (:cancel ctx))
-                                        {:content "Cancelled before it ran." :error? true}
-                                        (run-tool-call ctx call)))))
-                             messages (:tool_calls message))]
-        (if-let [reason (stop-reason ctx {:turn turn :response response :messages messages})]
-          {:messages messages :stop-reason reason}
-          (recur messages (inc turn)))))))
+  [ctx transcript]
+  (let [t (if (instance? clojure.lang.Atom transcript) transcript (atom (vec transcript)))]
+    (binding [*in-loop* true]
+      (loop [turn 1]
+        (if (cancel/cancelled? (:cancel ctx))
+          {:messages @t :stop-reason :cancelled}
+          (let [{:keys [message] :as response} (model-turn ctx @t)
+                keep? (and message (or (seq (:content message)) (seq (:tool_calls message))))
+                ;; Every tool call must get a tool message, even when cancelled,
+                ;; or the next request is rejected by the API.
+                results (mapv (fn [call]
+                                (tool-result-message
+                                 call
+                                 (if (cancel/cancelled? (:cancel ctx))
+                                   {:content "Cancelled before it ran." :error? true}
+                                   (run-tool-call ctx call))))
+                              (:tool_calls message))
+                messages (swap! t into (cond->> results keep? (cons message)))]
+            (if-let [reason (stop-reason ctx {:turn turn :response response :messages messages})]
+              {:messages messages :stop-reason reason}
+              (recur (inc turn)))))))))
+
+;; ---------------------------------------------------------------------------
+;; Calling tools and the model from Lisp
+
+(defn- tool-call-name
+  "The tool name `tool` means: a var, a symbol naming a var (qualified) or a
+  tool (unqualified), or a string."
+  [tool]
+  (cond (var? tool) (custom/tool-name tool)
+        (and (symbol? tool) (namespace tool))
+        (custom/tool-name (or (resolve tool) (throw (ex-info (str "No var " tool) {}))))
+        :else (name tool)))
+
+(defn tool-call-messages
+  "The transcript pair recording a tool call made from Lisp, exactly as if
+  the model had made it: an assistant message with one tool_calls entry,
+  then the tool message with the same id."
+  [{:keys [id name args]} result]
+  [{:role "assistant" :content nil
+    :tool_calls [{:id id :type "function"
+                  :function {:name name :arguments (json/generate-string args)}}]}
+   (tool-result-message {:id id} result)])
+
+(defn call-tool
+  "Call a tool as the agent would: through run-tool-call, so the
+  before/after-tool hooks run and the client shows the call. `tool` is a
+  var, a symbol or a tool name; `args` a map. Returns {:content :error?}.
+
+  Options: :record? appends the call and its result to the session
+  transcript (see tool-call-messages), so the model sees it on the next
+  turn; the default is true inside a session when no model turn is running
+  (a command, /eval, nREPL), false otherwise. :ctx overrides the context
+  (default oml.session/ctx)."
+  [tool args & {:keys [record? ctx]}]
+  (let [ctx (or ctx (session/ctx))
+        record? (if (some? record?) record? (boolean (and (session/session) (not *in-loop*))))
+        call {:id (str "call_" (subs (str/replace (str (random-uuid)) "-" "") 0 24))
+              :name (tool-call-name tool)
+              :args (or args {})}
+        _ (when (and record? (nil? (session/session)))
+            (throw (ex-info "call-tool :record? needs a current session" {})))
+        result (run-tool-call ctx {:id (:id call) :type "function"
+                                   :function {:name (:name call)
+                                              :arguments (json/generate-string (:args call))}})]
+    (when record?
+      (swap! (:transcript (session/session)) into (tool-call-messages call result)))
+    result))
+
+(defn complete
+  "One model call without tools; returns the answer text. `prompt` is a
+  string (one user message) or a vector of messages. Options: :system (a
+  system message in front), :model (instead of oml.llm/model). Goes
+  through call-model (so its advice applies) but not the model hooks, and
+  shows nothing to the user. Inside a prompt, cancelling it cancels this
+  call (and it throws)."
+  [prompt & {:keys [system model]}]
+  (let [messages (if (string? prompt) [{:role "user" :content prompt}] (vec prompt))
+        cancel (:cancel (session/session))
+        {:keys [message cancelled?]}
+        (call-model {:cancel cancel :on-event (fn [_])}
+                    (cond-> {:messages (cond->> messages system (into [{:role "system" :content system}]))
+                             :tools []}
+                      model (assoc :model model)))]
+    (when (or cancelled? (cancel/cancelled? cancel))
+      (throw (ex-info "Cancelled" {:cancelled true})))
+    (:content message)))
 
 ;; ---------------------------------------------------------------------------
 ;; Prompts and commands

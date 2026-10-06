@@ -6,7 +6,8 @@
   Compare with pi: packages/coding-agent/src/modes/print-mode.ts"
   (:require [clojure.string :as str]
             [oml.agent :as agent]
-            [oml.init :as init]))
+            [oml.init :as init]
+            [oml.session :as session]))
 
 (defn- first-line [s]
   (let [l (first (str/split-lines (str s)))]
@@ -15,6 +16,7 @@
 (defn- on-event [{:keys [type] :as e}]
   (case type
     :text-delta (do (print (:text e)) (flush))
+    :thought-delta nil
     :tool-start (println (str "\n> " (:name e) ": " (:title e)))
     :tool-end   (println (str (if (:error? e) "  failed: " "  ok: ") (first-line (:content e))))
     nil))
@@ -28,14 +30,15 @@
     (init/startup!)
     (init/load-project-init! cwd)
     (try
-      (let [ctx {:cwd cwd :on-event on-event}
-            {:keys [command input]} (agent/parse-prompt text)]
-        (if command
-          (println (agent/run-command ctx command input))
-          (let [result (agent/run ctx [{:role "user" :content text}])]
-            (println)
-            (when (not= :end-turn (:stop-reason result))
-              (binding [*out* *err*] (println "[stopped:" (name (:stop-reason result)) "]"))))))
+      (session/with-session (session/create! {:cwd cwd :on-event on-event})
+        (let [{:keys [command input]} (agent/parse-prompt text)]
+          (if command
+            (println (agent/run-command (session/ctx) command input))
+            (let [_ (session/append-message! {:role "user" :content text})
+                  result (agent/run (session/ctx) (:transcript (session/session)))]
+              (println)
+              (when (not= :end-turn (:stop-reason result))
+                (binding [*out* *err*] (println "[stopped:" (name (:stop-reason result)) "]")))))))
       (catch clojure.lang.ExceptionInfo e
         (binding [*out* *err*] (println "error:" (ex-message e)))
         (System/exit 1)))))
