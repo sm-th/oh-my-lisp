@@ -62,7 +62,7 @@
 
 (deftest stream-chat-errors
   (testing "missing model"
-    (is (thrown-with-msg? Exception #"OML_MODEL"
+    (is (thrown-with-msg? Exception #"OPENAI_MODEL"
                           (llm/stream-chat {:base-url "http://127.0.0.1:1"} {:messages []}))))
   (testing "HTTP error status carries the body"
     (let [srv (fake/start! [])]

@@ -18,14 +18,13 @@
 ;; Configuration
 
 (defn config
-  "Read the endpoint configuration from the environment."
+  "Read the endpoint configuration from the standard OPENAI_* variables."
   ([] (config (System/getenv)))
   ([env]
    (let [env (into {} env)]
-     {:base-url (or (get env "OML_BASE_URL") "https://openrouter.ai/api/v1")
-      :api-key  (some #(not-empty (get env %))
-                      ["OML_API_KEY" "OPENROUTER_API_KEY" "OPENAI_API_KEY"])
-      :model    (not-empty (get env "OML_MODEL"))})))
+     {:base-url (or (not-empty (get env "OPENAI_BASE_URL")) "https://api.openai.com/v1")
+      :api-key  (not-empty (get env "OPENAI_API_KEY"))
+      :model    (not-empty (get env "OPENAI_MODEL"))})))
 
 ;; ---------------------------------------------------------------------------
 ;; SSE parsing
@@ -125,7 +124,7 @@
   [{:keys [base-url api-key model]} {:keys [messages tools on-event cancel]
                                      :or {on-event (fn [_])}}]
   (when-not model
-    (throw (ex-info "No model configured: set OML_MODEL (e.g. OML_MODEL=openai/gpt-4o-mini)." {})))
+    (throw (ex-info "No model configured: set OPENAI_MODEL (e.g. OPENAI_MODEL=gpt-4o-mini)." {})))
   (let [resp (http/post (str (str/replace base-url #"/+$" "") "/chat/completions")
                         {:headers (cond-> {"Content-Type" "application/json"
                                            "Accept" "text/event-stream"}

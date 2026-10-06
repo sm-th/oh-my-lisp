@@ -188,7 +188,7 @@
 
 (defn -main [& _]
   (log "ACP agent ready on stdio")
-  ;; Read the configuration per call so a missing OML_MODEL is reported on
+  ;; Read the configuration per call so a missing OPENAI_MODEL is reported on
   ;; the prompt that needs it, not as a crash at startup.
   (serve System/in System/out {:llm-fn (fn [req] (llm/stream-chat (llm/config) req))})
   (shutdown-agents)

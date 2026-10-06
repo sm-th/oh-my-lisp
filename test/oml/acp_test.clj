@@ -13,9 +13,9 @@
 (defn- start-agent [base-url]
   (let [proc (p/process ["bb" "acp"]
                         {:dir (System/getProperty "user.dir")
-                         :extra-env {"OML_BASE_URL" base-url
-                                     "OML_MODEL" "fake/model"
-                                     "OML_API_KEY" "test-key"}
+                         :extra-env {"OPENAI_BASE_URL" base-url
+                                     "OPENAI_MODEL" "fake/model"
+                                     "OPENAI_API_KEY" "test-key"}
                          :err :inherit})
         inbox (LinkedBlockingQueue.)
         w (io/writer (:in proc))]

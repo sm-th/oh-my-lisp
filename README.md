@@ -5,7 +5,7 @@ to understand how coding agents work from the inside, and compared at each
 step with [pi](https://github.com/earendil-works/pi) (`~/pi/packages`).
 
 - It talks to models through any OpenAI-compatible **Chat Completions**
-  endpoint (OpenRouter by default), streaming over SSE.
+  endpoint, streaming over SSE.
 - It speaks the [Agent Client Protocol](https://agentclientprotocol.com) (ACP)
   as an **agent** over stdio, so any ACP client (Toad, Zed, Emacs
   agent-shell) is its UI.
@@ -44,11 +44,11 @@ locates its own `bb.edn`).
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `OML_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI-compatible base URL (`/chat/completions` is appended) |
-| `OML_API_KEY` | falls back to `OPENROUTER_API_KEY`, then `OPENAI_API_KEY` | Bearer token |
-| `OML_MODEL` | none, required when prompting | Model id, e.g. `openai/gpt-4o-mini` on OpenRouter |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible base URL (`/chat/completions` is appended); e.g. `https://openrouter.ai/api/v1` |
+| `OPENAI_API_KEY` | none | Bearer token |
+| `OPENAI_MODEL` | none, required when prompting | Model id, e.g. `gpt-4o-mini`, or `openai/gpt-4o-mini` on OpenRouter |
 
-A missing `OML_MODEL` is reported on the first prompt (as an error in print
+A missing `OPENAI_MODEL` is reported on the first prompt (as an error in print
 mode, as a JSON-RPC error in ACP mode), not at startup.
 
 ## How to test it by hand
@@ -62,7 +62,7 @@ from PyPI and later runs use uv's cache. Keys go in an optional, gitignored
 `.env`, loaded on shell entry:
 
 ```sh
-cp .env.example .env   # set OML_MODEL and OPENROUTER_API_KEY
+cp .env.example .env   # set OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL
 nix develop            # or: direnv allow  (.envrc: use flake)
 ```
 
@@ -76,7 +76,7 @@ nix develop            # or: direnv allow  (.envrc: use flake)
 Scripts find the repo through `OML_HOME`, which the shell sets to the
 directory you entered it from, so enter it from the repo root.
 
-### a) Print mode with an OpenRouter key
+### a) Print mode
 
 ```sh
 cd /some/scratch/project
@@ -112,8 +112,9 @@ Add Agent -> Add Custom Agent opens it):
       "command": "/absolute/path/to/oml/bin/oml-acp",
       "args": [],
       "env": {
-        "OML_MODEL": "openai/gpt-4o-mini",
-        "OPENROUTER_API_KEY": "sk-or-..."
+        "OPENAI_BASE_URL": "https://openrouter.ai/api/v1",
+        "OPENAI_API_KEY": "sk-...",
+        "OPENAI_MODEL": "openai/gpt-4o-mini"
       }
     }
   }
@@ -144,12 +145,12 @@ from `agent-shell-make-agent-config` with a `:client-maker` that calls
             (lambda (buffer)
               (acp-make-client
                :command (expand-file-name "~/sm-th/oml/bin/oml-acp")
-               :environment-variables '("OML_MODEL=openai/gpt-4o-mini")
+               :environment-variables '("OPENAI_MODEL=openai/gpt-4o-mini")
                :context-buffer buffer)))))
 ```
 
 `:environment-variables` is appended to Emacs's `process-environment`, so an
-`OPENROUTER_API_KEY` already set in Emacs is passed through.
+`OPENAI_API_KEY` / `OPENAI_BASE_URL` already set in Emacs are passed through.
 
 ### What the ACP surface supports
 
