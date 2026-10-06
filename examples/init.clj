@@ -76,8 +76,14 @@
                       (count (:tools request)) "tools"))
            (call-model ctx request)))
 
-;; --- Require a module from the load path -------------------------------------
+;; --- Require modules from the load path ---------------------------------------
 ;; ~/.config/oml/lisp (and <project>/.oml/lisp) are on the classpath, so
-;; ~/.config/oml/lisp/my/notes.clj is the namespace my.notes.
+;; ~/.config/oml/lisp/my/notes.clj is the namespace my.notes. Each of these
+;; recipes is plain user code on top of the core's primitives:
 
-(require 'my.notes)
+(require 'my.notes         ; a prompt section and /notes
+         'my.context       ; AGENTS.md / CLAUDE.md in the system prompt
+         'my.usage         ; token usage per session, /usage
+         'my.search        ; ls, find, grep tools; /ls-here calls ls as the agent
+         'my.model         ; /model shows or switches the model
+         'my.permissions)  ; ask before write, edit and bash
