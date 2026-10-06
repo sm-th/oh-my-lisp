@@ -12,19 +12,30 @@
             [cheshire.core :as json]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [oml.cancel :as cancel]))
+            [oml.cancel :as cancel]
+            [oml.custom :refer [defsetting]]))
 
 ;; ---------------------------------------------------------------------------
-;; Configuration
+;; Settings (defaults from the standard OPENAI_* variables)
+
+(defsetting base-url
+  "OpenAI-compatible base URL; /chat/completions is appended."
+  (or (not-empty (System/getenv "OPENAI_BASE_URL")) "https://api.openai.com/v1"))
+
+(defsetting api-key
+  "Bearer token for the model endpoint, or nil."
+  (not-empty (System/getenv "OPENAI_API_KEY")))
+
+(defsetting model
+  "Model id, e.g. \"gpt-4o-mini\" (or \"openai/gpt-4o-mini\" on OpenRouter).
+  Required when prompting."
+  (not-empty (System/getenv "OPENAI_MODEL")))
 
 (defn config
-  "Read the endpoint configuration from the standard OPENAI_* variables."
-  ([] (config (System/getenv)))
-  ([env]
-   (let [env (into {} env)]
-     {:base-url (or (not-empty (get env "OPENAI_BASE_URL")) "https://api.openai.com/v1")
-      :api-key  (not-empty (get env "OPENAI_API_KEY"))
-      :model    (not-empty (get env "OPENAI_MODEL"))})))
+  "The endpoint configuration for stream-chat, read from the settings at
+  call time."
+  []
+  {:base-url base-url :api-key api-key :model model})
 
 ;; ---------------------------------------------------------------------------
 ;; SSE parsing
@@ -124,7 +135,7 @@
   [{:keys [base-url api-key model]} {:keys [messages tools on-event cancel]
                                      :or {on-event (fn [_])}}]
   (when-not model
-    (throw (ex-info "No model configured: set OPENAI_MODEL (e.g. OPENAI_MODEL=gpt-4o-mini)." {})))
+    (throw (ex-info "No model configured: set OPENAI_MODEL (e.g. OPENAI_MODEL=gpt-4o-mini) or (setq oml.llm/model ...) in init.clj." {})))
   (let [resp (http/post (str (str/replace base-url #"/+$" "") "/chat/completions")
                         {:headers (cond-> {"Content-Type" "application/json"
                                            "Accept" "text/event-stream"}
