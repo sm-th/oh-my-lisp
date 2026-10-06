@@ -26,6 +26,9 @@
           '';
         in
         {
+          # Only babashka: what CI needs for `bb test` and `bb site`.
+          ci = pkgs.mkShell { packages = [ pkgs.babashka ]; };
+
           default = pkgs.mkShell {
             packages = [
               pkgs.babashka
