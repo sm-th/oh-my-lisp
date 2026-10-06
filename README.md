@@ -27,7 +27,8 @@ See [docs/CHAPTERS.md](docs/CHAPTERS.md) for the plan and status.
 
 ## Running
 
-Requires [babashka](https://babashka.org) (tested with 1.13.219).
+Requires [babashka](https://babashka.org) (tested with 1.13.219 and 1.13.220).
+The devenv below provides it.
 
 ```sh
 bb acp                 # ACP agent on stdin/stdout (logs go to stderr)
@@ -52,13 +53,35 @@ mode, as a JSON-RPC error in ACP mode), not at startup.
 
 ## How to test it by hand
 
+### Environment: devenv
+
+[devenv](https://devenv.sh) pins everything the manual flow needs:
+babashka (1.13.220 from `cachix/devenv-nixpkgs/rolling`, locked in
+`devenv.lock`), Python 3.14 + uv, and Toad (`batrachian-toad==0.6.20`,
+installed with uv into `.devenv/state/venv` on first shell entry; Toad is
+not in nixpkgs). Keys go in an optional, gitignored `.env`:
+
+```sh
+cp .env.example .env   # set OML_MODEL and OPENROUTER_API_KEY
+devenv shell           # or: devenv shell -- oml-test
+```
+
+| Script | Runs |
+|---|---|
+| `oml-test` | `bb test` |
+| `oml-prompt "text"` | `bb prompt` in the current directory |
+| `oml-acp` | `bin/oml-acp` (ACP agent on stdio) |
+| `oml-toad [dir]` | `toad acp bin/oml-acp <dir or $PWD>` |
+
+With direnv, `direnv allow` loads the same shell via `.envrc`; it is
+optional. Without devenv, install bb and Toad yourself
+(`uv tool install batrachian-toad --python 3.14`) and export the variables.
+
 ### a) Print mode with an OpenRouter key
 
 ```sh
-export OPENROUTER_API_KEY=sk-or-...
-export OML_MODEL=openai/gpt-4o-mini
 cd /some/scratch/project
-bb --config ~/sm-th/oml/bb.edn prompt "List the files here, then create hello.txt containing hi"
+oml-prompt "List the files here, then create hello.txt containing hi"
 ```
 
 Text streams as it arrives; each tool call prints as `> name: title`
@@ -68,22 +91,12 @@ a scratch directory.
 
 ### b) Toad as the ACP client
 
-Toad ([github.com/batrachianai/toad](https://github.com/batrachianai/toad))
-installs with uv:
+[Toad](https://github.com/batrachianai/toad)'s `toad acp COMMAND PATH` runs
+any command as an ACP agent. It starts the command through a shell in the
+project directory, inheriting the devenv environment (`.env` included):
 
 ```sh
-uv tool install -U batrachian-toad --python 3.14
-```
-
-`toad acp COMMAND [PATH]` runs any command as an ACP agent (see `toad acp
---help`; implemented in `src/toad/cli.py`). Toad starts the command through
-a shell with its own environment, in the project directory, so export the
-variables first:
-
-```sh
-export OPENROUTER_API_KEY=sk-or-...
-export OML_MODEL=openai/gpt-4o-mini
-toad acp ~/sm-th/oml/bin/oml-acp ~/some/project
+oml-toad ~/some/project
 ```
 
 ### c) Zed
