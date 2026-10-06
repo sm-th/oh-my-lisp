@@ -22,8 +22,9 @@
   "OpenAI-compatible base URL; /chat/completions is appended."
   (or (not-empty (System/getenv "OPENAI_BASE_URL")) "https://api.openai.com/v1"))
 
-(defsetting api-key
-  "Bearer token for the model endpoint, or nil."
+(defsetting ^:oml/secret api-key
+  "Bearer token for the model endpoint, or nil. Marked :oml/secret, so
+  /describe and /settings do not show it."
   (not-empty (System/getenv "OPENAI_API_KEY")))
 
 (defsetting model

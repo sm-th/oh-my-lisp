@@ -27,7 +27,8 @@
 
   Like `defonce` (and Emacs' defvar), re-evaluating a defsetting keeps a value
   that is already there, so re-loading a namespace does not undo the user's
-  configuration. The default form is kept as :oml/default for /describe."
+  configuration. The default form is kept as :oml/default for /describe.
+  Metadata on the name is kept: ^:oml/secret hides the value in listings."
   [name doc default]
   `(do (defonce ~name ~default)
        (alter-meta! (var ~name) assoc :doc ~doc :oml/setting true :oml/default '~default)

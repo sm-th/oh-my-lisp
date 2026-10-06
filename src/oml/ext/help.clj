@@ -27,6 +27,11 @@
       (and (not (:macro m)) (fn? @v)) (conj "function")
       (not (fn? @v))          (conj "variable"))))
 
+(defn- shown
+  "The printed value of setting `v`; secrets are hidden."
+  [v]
+  (if (and (:oml/secret (meta v)) (some? @v)) "<hidden>" (pr-str @v)))
+
 (defn- user-var?
   "A var defined from source (oml, extensions, init files), not built into bb."
   [v]
@@ -55,7 +60,7 @@
       [(str "## " (custom/var-name v) "  (" (str/join ", " (kinds v)) ")")
        ""]
       (when (:oml/setting m)
-        [(str "Value: `" (pr-str @v) "`  Default: `" (pr-str (:oml/default m)) "`") ""])
+        [(str "Value: `" (shown v) "`  Default: `" (pr-str (:oml/default m)) "`") ""])
       (when (:oml/hook m)
         [(str "Functions: `" (pr-str @v) "`") ""])
       (when-let [a (:arglists m)]
@@ -111,7 +116,7 @@
   {:oml/command true}
   [_ctx _input]
   (str/join "\n" (for [v (custom/settings)]
-                   (str "- `" (custom/var-name v) "` = `" (pr-str @v) "` "
+                   (str "- `" (custom/var-name v) "` = `" (shown v) "` "
                         (custom/summary (:doc (meta v)))))))
 
 (defn tools

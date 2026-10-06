@@ -171,6 +171,10 @@
             (is (str/includes? text "Value: `30`"))
             (is (str/includes? text "Model calls allowed"))
             (is (re-find #"agent\.clj:\d+" text))))
+        (testing "secret settings are not shown"
+          (let [text (message-text (first (prompt! agent sid "/describe oml.llm/api-key")))]
+            (is (str/includes? text "Value: `<hidden>`"))
+            (is (not (str/includes? text "test-key")))))
         (testing "/describe finds unqualified names and tools"
           (let [text (message-text (first (prompt! agent sid "/describe run-tool-call")))]
             (is (str/includes? text "oml.agent/run-tool-call"))
