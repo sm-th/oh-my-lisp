@@ -2,6 +2,6 @@
  :tasks
  {test {:doc "Run the test suite"
         :extra-paths ["test"]
-        :requires ([clojure.test :as t] [oml.llm-test] [oml.tools-test])
-        :task (let [{:keys [fail error]} (t/run-tests 'oml.llm-test 'oml.tools-test)]
+        :requires ([clojure.test :as t] [oml.llm-test] [oml.tools-test] [oml.agent-test])
+        :task (let [{:keys [fail error]} (t/run-tests 'oml.llm-test 'oml.tools-test 'oml.agent-test)]
                 (System/exit (if (zero? (+ fail error)) 0 1)))}}}
