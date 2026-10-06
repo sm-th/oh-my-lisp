@@ -137,15 +137,19 @@
 (defn settings [] (vars-with :oml/setting))
 (defn hooks [] (vars-with :oml/hook))
 
-(defn first-line [s]
-  (or (first (str/split-lines (str/trim (str s)))) ""))
-
-(defn- doc-text
-  "A docstring as one paragraph-preserving text without source indentation."
+(defn doc-text
+  "A docstring as text without source line breaks and indentation;
+  paragraphs are kept."
   [s]
   (->> (str/split (str/trim (str s)) #"\n\s*\n")
        (map #(str/replace (str/trim %) #"\s*\n\s*" " "))
        (str/join "\n\n")))
+
+(defn summary
+  "The first sentence of a docstring, for one-line listings."
+  [s]
+  (let [p (first (str/split (doc-text s) #"\n\n"))]
+    (or (second (re-find #"^(.*?[.!?])(\s+[A-Z]|$)" p)) p)))
 
 (defn- by-name
   "Index vars by (name-fn v). On a name clash, the var that sorts last wins."
@@ -211,5 +215,5 @@
   "The ACP AvailableCommand for command var `v`."
   [v]
   (let [m (meta v)]
-    (cond-> {:name (command-name v) :description (first-line (:doc m))}
+    (cond-> {:name (command-name v) :description (summary (:doc m))}
       (:oml/hint m) (assoc :input {:hint (:oml/hint m)}))))

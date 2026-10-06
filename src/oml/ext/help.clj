@@ -87,7 +87,7 @@
       (str "Nothing matches " (pr-str (str/trim input)))
       (str/join "\n" (for [v hits]
                        (str "- `" (custom/var-name v) "` (" (str/join ", " (kinds v)) ") "
-                            (custom/first-line (:doc (meta v)))))))))
+                            (custom/summary (:doc (meta v)))))))))
 
 (defn eval
   "Evaluate Clojure forms in the agent process (like M-:) and show the last value."
@@ -112,7 +112,7 @@
   [_ctx _input]
   (str/join "\n" (for [v (custom/settings)]
                    (str "- `" (custom/var-name v) "` = `" (pr-str @v) "` "
-                        (custom/first-line (:doc (meta v)))))))
+                        (custom/summary (:doc (meta v)))))))
 
 (defn tools
   "List the tools and whether they are offered to the model."
@@ -122,14 +122,14 @@
     (str/join "\n" (for [v (custom/tools)]
                      (str "- `" (custom/tool-name v) "` (" (custom/var-name v)
                           (when-not (enabled v) ", disabled") ") "
-                          (custom/first-line (:doc (meta v))))))))
+                          (custom/summary (:doc (meta v))))))))
 
 (defn commands
   "List the slash commands."
   {:oml/command true}
   [_ctx _input]
   (str/join "\n" (for [v (custom/commands)]
-                   (str "- `/" (custom/command-name v) "` " (custom/first-line (:doc (meta v)))))))
+                   (str "- `/" (custom/command-name v) "` " (custom/summary (:doc (meta v)))))))
 
 (defn hooks
   "List the hook variables and the functions on them."
